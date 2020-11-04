@@ -86,7 +86,7 @@ class Tracking(commands.Cog):
             else:
                 avatar = int(after.discriminator) % 5
                 filename = f"{avatar}.png"
-                async with self.session.get(
+                async with self.bot.session.get(
                     f"https://cdn.discordapp.com/embed/avatars/{avatar}.png"
                 ) as resp:
                     with open(f"images/{filename}", "wb") as f:
@@ -187,7 +187,7 @@ class Tracking(commands.Cog):
             else:
                 avatar = int(user.discriminator) % 5
                 filename = f"{avatar}.png"
-                async with self.session.get(
+                async with self.bot.session.get(
                     f"https://cdn.discordapp.com/embed/avatars/{avatar}.png"
                 ) as resp:
                     with open(f"images/{filename}", "wb") as f:
