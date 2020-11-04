@@ -84,13 +84,15 @@ class Tracking(commands.Cog):
                     {"user_id": after.id, "filename": filename, "hash": after.avatar}
                 )
             else:
-                avatar = int(after.discriminator)%5
+                avatar = int(after.discriminator) % 5
                 filename = f"{avatar}.png"
-                async with self.session.get(f"https://cdn.discordapp.com/embed/avatars/{avatar}.png") as resp:
+                async with self.session.get(
+                    f"https://cdn.discordapp.com/embed/avatars/{avatar}.png"
+                ) as resp:
                     with open(f"images/{filename}", "wb") as f:
                         f.write(await resp.read())
 
-                avatar_batch.append(
+                self._avatar_batch.append(
                     {"user_id": after.id, "filename": filename, "hash": None}
                 )
 
@@ -99,12 +101,12 @@ class Tracking(commands.Cog):
 
         if before.nick != after.nick:
             self._nick_batch.append(
-                    {
-                        "user_id": after.id,
-                        "guild_id": after.guild.id,
-                        "nick": after.nick,
-                    }
-                )
+                {
+                    "user_id": after.id,
+                    "guild_id": after.guild.id,
+                    "nick": after.nick,
+                }
+            )
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
@@ -179,18 +181,21 @@ class Tracking(commands.Cog):
                             """
                     await self.bot.db.execute(query, user.id, filename, user.avatar)
                 except discord.NotFound:
-                    log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring.")
+                    log.warning(
+                        f"Failed to fetch avatar for {user} ({user.id}). Ignoring."
+                    )
             else:
-                avatar = int(user.discriminator)%5
+                avatar = int(user.discriminator) % 5
                 filename = f"{avatar}.png"
-                async with self.session.get(f"https://cdn.discordapp.com/embed/avatars/{avatar}.png") as resp:
+                async with self.session.get(
+                    f"https://cdn.discordapp.com/embed/avatars/{avatar}.png"
+                ) as resp:
                     with open(f"images/{filename}", "wb") as f:
                         f.write(await resp.read())
 
-                avatar_batch.append(
+                self._avatar_batch.append(
                     {"user_id": user.id, "filename": filename, "hash": None}
                 )
-
 
         if not user_names or user_names[-1]["name"] != user.name:
             query = """INSERT INTO names (user_id, name)
@@ -212,7 +217,7 @@ class Tracking(commands.Cog):
         content = ""
         for name in names:
             recorded_at = name["recorded_at"]
-            timedelta = datetime.datetime.utcnow()-recorded_at
+            timedelta = datetime.datetime.utcnow() - recorded_at
             content += f"\n{name['name']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
 
         await ctx.send(content)
@@ -236,10 +241,11 @@ class Tracking(commands.Cog):
         content = ""
         for nick in nicks:
             recorded_at = nick["recorded_at"]
-            timedelta = datetime.datetime.utcnow()-recorded_at
+            timedelta = datetime.datetime.utcnow() - recorded_at
             content += f"\n{nick['nick']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
 
         await ctx.send(content)
+
 
 def setup(bot):
     bot.add_cog(Tracking(bot))
