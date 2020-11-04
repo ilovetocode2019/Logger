@@ -60,7 +60,7 @@ class Logger(commands.Bot):
                    id SERIAL PRIMARY KEY,
                    user_id BIGINT,
                    name TEXT,
-                   recorded_att TIMESTAMP DEFAULT (now() at time zone 'utc')
+                   recorded_at TIMESTAMP DEFAULT (now() at time zone 'utc')
                    );
                 """
         await self.db.execute(query)
