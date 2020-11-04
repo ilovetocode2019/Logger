@@ -93,12 +93,15 @@ class Logger(commands.Bot):
             if not user_avatars or user_avatars[-1]["hash"] != user.avatar:
 
                 if user.avatar:
-                    filename = f"{user.id}-{user.avatar}.png"
-                    await user.avatar_url_as(format="png").save(f"images/{filename}")
+                    try:
+                        filename = f"{user.id}-{user.avatar}.png"
+                        await user.avatar_url_as(format="png").save(f"images/{filename}")
 
-                    avatar_batch.append(
-                        {"user_id": user.id, "filename": filename, "hash": user.avatar}
-                    )
+                        avatar_batch.append(
+                            {"user_id": user.id, "filename": filename, "hash": user.avatar}
+                        )
+                    except discord.NotFound:
+                        log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring.")
 
                 else:
                     avatar = int(user.discriminator)%5

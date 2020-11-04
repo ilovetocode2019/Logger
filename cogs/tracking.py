@@ -170,13 +170,16 @@ class Tracking(commands.Cog):
 
         if not user_avatars or user_avatars[-1]["hash"] != user.avatar:
             if user.avatar:
-                filename = f"{user.id}-{user.avatar}.png"
-                await user.avatar_url_as(format="png").save(f"images/{filename}")
+                try:
+                    filename = f"{user.id}-{user.avatar}.png"
+                    await user.avatar_url_as(format="png").save(f"images/{filename}")
 
-                query = """INSERT INTO avatars (user_id, filename, hash)
-                            VALUES ($1, $2, $3);
-                        """
-                await self.bot.db.execute(query, user.id, filename, user.avatar)
+                    query = """INSERT INTO avatars (user_id, filename, hash)
+                                VALUES ($1, $2, $3);
+                            """
+                    await self.bot.db.execute(query, user.id, filename, user.avatar)
+                except discord.NotFound:
+                    log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring.")
             else:
                 avatar = int(user.discriminator)%5
                 filename = f"{avatar}.png"
