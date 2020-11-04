@@ -207,6 +207,9 @@ class Tracking(commands.Cog):
                 """
         nicks = await self.bot.db.fetch(query, user.id, ctx.guild.id)
 
+        if not nicks:
+            return await ctx.send(":x: You have no nicknames for this server")
+
         content = ""
         for nick in nicks:
             recorded_at = nick["recorded_at"]
