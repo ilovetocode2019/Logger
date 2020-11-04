@@ -4,6 +4,8 @@ from discord.ext import commands, tasks
 import asyncio
 import logging
 import asyncpg
+import humanize
+import datetime
 
 log = logging.getLogger("logger.tracking")
 
@@ -173,6 +175,45 @@ class Tracking(commands.Cog):
                     """
             await self.bot.db.execute(query, user.id, user.name)
 
+    @commands.command(name="names", description="View past usernames for a user")
+    async def names(self, ctx, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        query = """SELECT *
+                   FROM names
+                   WHERE names.user_id=$1;
+                """
+        names = await self.bot.db.fetch(query, user.id)
+
+        content = ""
+        for name in names:
+            recorded_at = name["recorded_at"]
+            timedelta = datetime.datetime.utcnow()-recorded_at
+            content += f"\n{name['name']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+
+        await ctx.send(content)
+
+        await ctx.send("\n".join(names))
+
+    @commands.command(name="nicks", description="View past nicknames for a user")
+    async def nicks(self, ctx, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        query = """SELECT *
+                   FROM nicks
+                   WHERE nicks.user_id=$1 AND nicks.guild_id=$2;
+                """
+        nicks = await self.bot.db.fetch(query, user.id, ctx.guild.id)
+
+        content = ""
+        for nick in nicks:
+            recorded_at = nick["recorded_at"]
+            timedelta = datetime.datetime.utcnow()-recorded_at
+            content += f"\n{nick['nick']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+
+        await ctx.send(content)
 
 def setup(bot):
     bot.add_cog(Tracking(bot))

@@ -2,3 +2,4 @@ discord.py
 jishaku
 asyncpg
 aiohttp
+humanize
