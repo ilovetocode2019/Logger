@@ -90,15 +90,26 @@ class Logger(commands.Bot):
             user_avatars = [
                 avatar for avatar in avatars if avatar["user_id"] == user.id
             ]
-            if user.avatar and (
-                not user_avatars or user_avatars[-1]["hash"] != user.avatar
-            ):
-                filename = f"{user.id}-{user.avatar}.png"
-                await user.avatar_url_as(format="png").save(f"images/{filename}")
+            if not user_avatars or user_avatars[-1]["hash"] != user.avatar:
 
-                avatar_batch.append(
-                    {"user_id": user.id, "filename": filename, "hash": user.avatar}
-                )
+                if user.avatar:
+                    filename = f"{user.id}-{user.avatar}.png"
+                    await user.avatar_url_as(format="png").save(f"images/{filename}")
+
+                    avatar_batch.append(
+                        {"user_id": user.id, "filename": filename, "hash": user.avatar}
+                    )
+
+                else:
+                    avatar = int(user.discriminator)%5
+                    filename = f"{avatar}.png"
+                    async with self.session.get(f"https://cdn.discordapp.com/embed/avatars/{avatar}.png") as resp:
+                        with open(f"images/{filename}", "wb") as f:
+                            f.write(await resp.read())
+
+                    avatar_batch.append(
+                        {"user_id": user.id, "filename": filename, "hash": None}
+                    )
 
             user_names = [name for name in names if name["user_id"] == user.id]
             if not user_names or user_names[-1]["name"] != user.name:

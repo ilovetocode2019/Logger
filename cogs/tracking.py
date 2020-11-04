@@ -72,17 +72,27 @@ class Tracking(commands.Cog):
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):
-
         if before.name != after.name:
             self._name_batch.append({"user_id": after.id, "name": after.name})
 
         if before.avatar != after.avatar:
-            filename = f"{after.id}-{after.avatar}.png"
-            await after.avatar_url_as(format="png").save(f"images/{filename}")
+            if after.avatar:
+                filename = f"{after.id}-{after.avatar}.png"
+                await after.avatar_url_as(format="png").save(f"images/{filename}")
 
-            self._avatar_batch.append(
-                {"user_id": after.id, "filename": filename, "hash": after.avatar}
-            )
+                self._avatar_batch.append(
+                    {"user_id": after.id, "filename": filename, "hash": after.avatar}
+                )
+            else:
+                avatar = int(after.discriminator)%5
+                filename = f"{avatar}.png"
+                async with self.session.get(f"https://cdn.discordapp.com/embed/avatars/{avatar}.png") as resp:
+                    with open(f"images/{filename}", "wb") as f:
+                        f.write(await resp.read())
+
+                avatar_batch.append(
+                    {"user_id": after.id, "filename": filename, "hash": None}
+                )
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
@@ -158,16 +168,26 @@ class Tracking(commands.Cog):
 
         log.info("Updating database")
 
-        if user.avatar and (
-            not user_avatars or user_avatars[-1]["hash"] != user.avatar
-        ):
-            filename = f"{user.id}-{user.avatar}.png"
-            await user.avatar_url_as(format="png").save(f"images/{filename}")
+        if not user_avatars or user_avatars[-1]["hash"] != user.avatar:
+            if user.avatar:
+                filename = f"{user.id}-{user.avatar}.png"
+                await user.avatar_url_as(format="png").save(f"images/{filename}")
 
-            query = """INSERT INTO avatars (user_id, filename, hash)
-                        VALUES ($1, $2, $3);
-                    """
-            await self.bot.db.execute(query, user.id, filename, user.avatar)
+                query = """INSERT INTO avatars (user_id, filename, hash)
+                            VALUES ($1, $2, $3);
+                        """
+                await self.bot.db.execute(query, user.id, filename, user.avatar)
+            else:
+                avatar = int(user.discriminator)%5
+                filename = f"{avatar}.png"
+                async with self.session.get(f"https://cdn.discordapp.com/embed/avatars/{avatar}.png") as resp:
+                    with open(f"images/{filename}", "wb") as f:
+                        f.write(await resp.read())
+
+                avatar_batch.append(
+                    {"user_id": user.id, "filename": filename, "hash": None}
+                )
+
 
         if not user_names or user_names[-1]["name"] != user.name:
             query = """INSERT INTO names (user_id, name)
