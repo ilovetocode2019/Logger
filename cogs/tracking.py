@@ -8,6 +8,7 @@ import humanize
 import datetime
 import io
 import functools
+import os
 from PIL import Image
 
 log = logging.getLogger("logger.tracking")
@@ -319,6 +320,30 @@ class Tracking(commands.Cog):
             image.save(file, "PNG")
 
         return file
+
+    @commands.command(name="avatar", description="View a specific avatar in history")
+    async def avatar(self, ctx, avatar: int, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        query = """SELECT *
+                   FROM avatars
+                   WHERE avatars.user_id=$1
+                   ORDER BY avatars.recorded_at DESC;
+                """
+        avatars = await self.bot.db.fetch(query, user.id)
+
+        try:
+            avatar = avatars[avatar-1]
+        except IndexError:
+            return await ctx.send(":x: Invalid avatar index")
+
+        em = discord.Embed(timestamp=avatar["recorded_at"])
+        em.set_author(name=user.display_name, icon_url=user.avatar_url)
+        em.set_image(url="attachment://image.png")
+        em.set_footer(text="Recorded")
+
+        await ctx.send(content=f"Hash: {avatar['hash']}", embed=em, file=discord.File(f"images/{avatar['filename']}", filename="image.png"))
 
 def setup(bot):
     bot.add_cog(Tracking(bot))
