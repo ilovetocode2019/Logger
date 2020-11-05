@@ -23,9 +23,11 @@ class Logger(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix=config.prefix, intents=discord.Intents.all())
 
+        self.log = log
+
         self.loop.create_task(self.prepare_bot())
 
-        self.cogs_to_add = ["cogs.meta", "cogs.tracking"]
+        self.cogs_to_add = ["cogs.admin", "cogs.meta", "cogs.tracking"]
         self.load_extension("jishaku")
         for cog in self.cogs_to_add:
             self.load_extension(cog)
