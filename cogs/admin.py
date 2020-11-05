@@ -150,7 +150,7 @@ class Admin(commands.Cog):
             f"This will update the following modules, are you sure?\n{mods_text}"
         )
 
-        confirm = await Confirm(prompt_text).start(ctx)
+        confirm = await Confirm(prompt_text).prompt(ctx)
         if not confirm:
             return await ctx.send("Aborting.")
 
