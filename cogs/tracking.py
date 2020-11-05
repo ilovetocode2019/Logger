@@ -6,6 +6,8 @@ import logging
 import asyncpg
 import humanize
 import datetime
+import io
+from PIL import Image
 
 log = logging.getLogger("logger.tracking")
 
@@ -248,6 +250,70 @@ class Tracking(commands.Cog):
 
         await ctx.send(content)
 
+    @commands.command(name="avatars", descripion="Avatars")
+    async def avatars(self, ctx, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        query = """SELECT *
+                   FROM avatars
+                   WHERE avatars.user_id=$1
+                   ORDER BY avatars.recorded_at DESC;
+                """
+        avatars = await self.bot.db.fetch(query, user.id)
+
+        file = io.BytesIO()
+
+        if len(avatars) != 1:
+            counter = 2
+            while True:
+                boxes = counter**2
+                if boxes >= len(avatars):
+                    columns = counter
+                    break
+                counter += 1
+
+            if columns > 3:
+                size = 4096
+            else:
+                size = 2048
+
+            side_legnth = int(size/columns)
+
+            rows = 1
+            column = 0
+            for avatar in avatars:
+                if column == columns:
+                    rows += 1
+                    column = 0
+
+                column += 1
+
+            image = Image.new("RGB", (size, rows*side_legnth))
+
+            column = 0
+            row = 0
+            for avatar in avatars:
+                avatar = Image.open(f"images/{avatar['filename']}")
+                avatar = avatar.resize((side_legnth, side_legnth))
+
+                image.paste(avatar, (column*side_legnth, row*side_legnth))
+
+                column += 1
+                if column == columns:
+                    row += 1
+                    column = 0
+
+            image.save(file, "PNG", transparency=(0, 0, 0))
+
+        else:
+            image = Image.open(f"images/{avatars[0]['filename']}")
+
+            image.save(file, "PNG")
+
+        file.seek(0)
+
+        await ctx.send(file=discord.File(fp=file, filename="image.png"))
 
 def setup(bot):
     bot.add_cog(Tracking(bot))
