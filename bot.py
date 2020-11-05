@@ -21,7 +21,7 @@ log = logging.getLogger("logger")
 
 class Logger(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix=config.prefix, intents=discord.Intents.all())
+        super().__init__(command_prefix=config.prefix, intents=discord.Intents.all(), owner_ids=config.owner_ids)
 
         self.log = log
 
