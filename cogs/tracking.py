@@ -257,6 +257,8 @@ class Tracking(commands.Cog):
         if not user:
             user = ctx.author
 
+        await ctx.trigger_typing()
+
         query = """SELECT *
                    FROM avatars
                    WHERE avatars.user_id=$1
