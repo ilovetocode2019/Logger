@@ -7,6 +7,7 @@ import asyncpg
 import humanize
 import datetime
 import io
+import functools
 from PIL import Image
 
 log = logging.getLogger("logger.tracking")
@@ -262,6 +263,12 @@ class Tracking(commands.Cog):
                 """
         avatars = await self.bot.db.fetch(query, user.id)
 
+        partial = functools.partial(self.draw_image, avatars)
+        file = await self.bot.loop.run_in_executor(None, partial)
+        file.seek(0)
+        await ctx.send(file=discord.File(fp=file, filename="image.png"))
+
+    def draw_image(self, avatars):
         file = io.BytesIO()
 
         if len(avatars) != 1:
@@ -289,7 +296,7 @@ class Tracking(commands.Cog):
 
                 column += 1
 
-            image = Image.new("RGB", (size, rows*side_legnth))
+            image = Image.new("RGBA", (size, rows*side_legnth), (255, 0, 0, 0))
 
             column = 0
             row = 0
@@ -304,16 +311,14 @@ class Tracking(commands.Cog):
                     row += 1
                     column = 0
 
-            image.save(file, "PNG", transparency=(0, 0, 0))
+            image.save(file, "PNG")
 
         else:
             image = Image.open(f"images/{avatars[0]['filename']}")
 
             image.save(file, "PNG")
 
-        file.seek(0)
-
-        await ctx.send(file=discord.File(fp=file, filename="image.png"))
+        return file
 
 def setup(bot):
     bot.add_cog(Tracking(bot))
