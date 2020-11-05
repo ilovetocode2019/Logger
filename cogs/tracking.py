@@ -99,7 +99,7 @@ class Tracking(commands.Cog):
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
 
-        if before.nick != after.nick:
+        if after.nick and before.nick != after.nick:
             self._nick_batch.append(
                 {
                     "user_id": after.id,
