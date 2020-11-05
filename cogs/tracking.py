@@ -347,5 +347,37 @@ class Tracking(commands.Cog):
 
         await ctx.send(content=f"Hash: {avatar['hash']}", embed=em, file=discord.File(f"images/{avatar['filename']}", filename="image.png"))
 
+    @commands.command(name="userinfo", description="Get info on a user", aliases=["ui", "whois"])
+    async def userinfo(self, ctx, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        query = """SELECT *
+                   FROM names
+                   WHERE names.user_id=$1;
+                """
+        names = await self.bot.db.fetch(query, user.id)
+
+        query = """SELECT *
+                   FROM nicks
+                   WHERE nicks.user_id=$1 AND nicks.guild_id=$2;
+                """
+        nicks = await self.bot.db.fetch(query, user.id, ctx.guild.id)
+
+        query = """SELECT COUNT(*)
+                   FROM avatars
+                   WHERE avatars.user_id=$1;
+                """
+        avatars = await self.bot.db.fetchrow(query, user.id)
+
+        em = discord.Embed(title=f"{user.display_name} ({user.id})")
+        em.add_field(name="Names", value=", ".join([name["name"] for name in names]))
+        if nicks:
+            em.add_field(name="Nicks", value=", ".join([nick["nick"] for nick in nicks]))
+        em.add_field(name="Avatar Count", value=avatars["count"])
+
+        em.set_thumbnail(url=user.avatar_url)
+        await ctx.send(embed=em)
+
 def setup(bot):
     bot.add_cog(Tracking(bot))
