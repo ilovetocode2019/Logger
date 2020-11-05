@@ -210,7 +210,8 @@ class Tracking(commands.Cog):
 
         query = """SELECT *
                    FROM names
-                   WHERE names.user_id=$1;
+                   WHERE names.user_id=$1
+                   ORDER BY names.recorded_at DESC;
                 """
         names = await self.bot.db.fetch(query, user.id)
 
@@ -231,7 +232,8 @@ class Tracking(commands.Cog):
 
         query = """SELECT *
                    FROM nicks
-                   WHERE nicks.user_id=$1 AND nicks.guild_id=$2;
+                   WHERE nicks.user_id=$1 AND nicks.guild_id=$2
+                   ORDER BY nicks.recorded_at DESC;
                 """
         nicks = await self.bot.db.fetch(query, user.id, ctx.guild.id)
 
