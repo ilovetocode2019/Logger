@@ -49,7 +49,8 @@ class Admin(commands.Cog):
         invoke_without_command=True,
     )
     async def _reload(self, ctx, *, cog="all"):
-        "Reload an extension"
+        """Reload an extension"""
+
         if cog == "all":
             msg = ""
 
