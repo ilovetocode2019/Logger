@@ -54,7 +54,7 @@ class Admin(commands.Cog):
         if cog == "all":
             msg = ""
 
-            for ext in self.bot.cogs_to_load:
+            for ext in self.bot.cogs_to_add:
                 try:
                     self.bot.reload_extension(ext)
                     msg += (
