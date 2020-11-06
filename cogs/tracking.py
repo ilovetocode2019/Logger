@@ -227,8 +227,6 @@ class Tracking(commands.Cog):
 
         await ctx.send(content)
 
-        await ctx.send("\n".join(names))
-
     @commands.command(name="nicks", description="View past nicknames for a user")
     async def nicks(self, ctx, *, user: discord.Member = None):
         if not user:
@@ -242,7 +240,7 @@ class Tracking(commands.Cog):
         nicks = await self.bot.db.fetch(query, user.id, ctx.guild.id)
 
         if not nicks:
-            return await ctx.send(":x: You have no nicknames for this server")
+            return await ctx.send(":x: User has no recorded nicknames for this server")
 
         content = ""
         for nick in nicks:
