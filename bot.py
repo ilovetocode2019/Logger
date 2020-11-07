@@ -7,6 +7,7 @@ import asyncio
 import os
 import logging
 import json
+import asyncio
 
 import config
 
@@ -22,6 +23,7 @@ log = logging.getLogger("logger")
 class Logger(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix=config.prefix, intents=discord.Intents.all(), owner_ids=config.owner_ids)
+        self.db_ready = asyncio.Event()
 
         self.log = log
 
@@ -31,6 +33,10 @@ class Logger(commands.Bot):
         self.load_extension("jishaku")
         for cog in self.cogs_to_add:
             self.load_extension(cog)
+
+    async def wait_until_db_ready(self):
+        if not self.db_ready.is_set():
+            await self.db_ready.wait()
 
     async def prepare_bot(self):
         log.info("Preparing image directory")
@@ -74,6 +80,14 @@ class Logger(commands.Bot):
                    id SERIAL PRIMARY KEY,
                    user_id BIGINT,
                    name TEXT,
+                   recorded_at TIMESTAMP DEFAULT (now() at time zone 'utc')
+                   );
+
+                   CREATE TABLE IF NOT EXISTS presences (
+                   id SERIAL PRIMARY KEY,
+                   user_id BIGINT,
+                   guild_id BIGINT,
+                   status TEXT,
                    recorded_at TIMESTAMP DEFAULT (now() at time zone 'utc')
                    );
                 """
@@ -126,19 +140,12 @@ class Logger(commands.Bot):
                    x(user_id BIGINT, filename TEXT, hash TEXT)
                 """
 
-        changed = False
-
         if avatar_batch:
             await self.db.execute(query, avatar_batch)
             total = len(avatar_batch)
-            if total > 1:
-                log.info("Registered %s avatars to the database.", total)
-                changed = True
-
-        if not changed:
+            log.info("Registered %s avatar(s) to the database.", total)
+        else:
             log.info("No work needed for avatars")
-
-        changed = False
 
         query = """INSERT INTO names (user_id, name)
                    SELECT x.user_id, x.name
@@ -148,24 +155,26 @@ class Logger(commands.Bot):
 
         if name_batch:
             await self.db.execute(query, name_batch)
-            total = len(name_batch)
-            if total > 1:
-                log.info("Registered %s names to the database.", total)
-                changed = True
-
-        if not changed:
+            total = len(avatar_batch)
+            log.info("Registered %s name(s) to the database.", total)
+        else:
             log.info("No work needed for names")
+
+        self.db_ready.set()
 
     async def on_ready(self):
         log.info(f"Logged in as {self.user.name} - {self.user.id}")
 
         log.info("Loading database")
         nicks = await self.db.fetch("SELECT * FROM nicks;")
+        presences = await self.db.fetch("SELECT * FROM presences;")
 
         log.info("Preparing database")
 
-        log.info("Querying member nick changes")
+        log.info("Querying member, nick, and presence changes")
+
         nick_batch = []
+        presence_batch = []
 
         for member in self.get_all_members():
             member_nicks = [
@@ -184,23 +193,44 @@ class Logger(commands.Bot):
                     }
                 )
 
+            member_presences = [
+                presence
+                for presence in presences
+                if presence["user_id"] == member.id
+            ]
+            if (not member_presences or member_presences[-1]["status"] != str(member.status)) and member.id not in [presence["user_id"] for presence in presence_batch]:
+                presence_batch.append(
+                    {
+                        "user_id": member.id,
+                        "status": str(member.status)
+                    }
+                )
+
         query = """INSERT INTO nicks (user_id, guild_id, nick)
                    SELECT x.user_id, x.guild_id, x.nick
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, guild_id BIGINT, nick TEXT)
                 """
 
-        changed = False
-
         if nick_batch:
             await self.db.execute(query, nick_batch)
             total = len(nick_batch)
-            if total > 1:
-                log.info("Registered %s nicks to the database.", total)
-                changed = True
-
-        if not changed:
+            log.info("Registered %s nick(s) to the database.", total)
+        else:
             log.info("No work needed for nicks")
+
+        query = """INSERT INTO presences (user_id, guild_id, status)
+                   SELECT x.user_id, x.guild_id, x.status
+                   FROM jsonb_to_recordset($1::jsonb) AS
+                   x(user_id BIGINT, guild_id BIGINT, status TEXT)
+                """
+
+        if presence_batch:
+            await self.db.execute(query, presence_batch)
+            total = len(presence_batch)
+            log.info("Registered %s presence(s) to database.", total)
+        else:
+            log.info("No work needed to presences")
 
         await self.update_users()
 

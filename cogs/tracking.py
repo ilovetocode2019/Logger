@@ -9,10 +9,9 @@ import datetime
 import io
 import functools
 import os
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 log = logging.getLogger("logger.tracking")
-
 
 class Tracking(commands.Cog):
     def __init__(self, bot):
@@ -28,7 +27,30 @@ class Tracking(commands.Cog):
     def cog_unload(self):
         self.bulk_insert_loop.stop()
 
+    async def get_presence_batch(self):
+        presences = await self.bot.db.fetch("SELECT * FROM presences;")
+
+        presence_batch = []
+        for member in self.bot.get_all_members():
+            member_presences = [
+                presence
+                for presence in presences
+                if presence["user_id"] == member.id
+            ]
+            if (not member_presences or member_presences[-1]["status"] != str(member.status)) and member.id not in [presence["user_id"] for presence in presence_batch]:
+                presence_batch.append(
+                    {
+                        "user_id": member.id,
+                        "status": str(member.status)
+                    }
+                )
+
+        return presence_batch
+
+
     async def bulk_insert(self):
+        presence_batch = await self.get_presence_batch()
+
         query = """INSERT INTO avatars (user_id, filename, hash)
                    SELECT x.user_id, x.filename, x.hash
                    FROM jsonb_to_recordset($1::jsonb) AS
@@ -69,10 +91,27 @@ class Tracking(commands.Cog):
 
             self._nick_batch.clear()
 
+        query = """INSERT INTO presences (user_id, status)
+                   SELECT x.user_id, x.status
+                   FROM jsonb_to_recordset($1::jsonb) AS
+                   x(user_id BIGINT, status TEXT)
+                """
+
+        if presence_batch:
+            await self.bot.db.execute(query, presence_batch)
+            total = len(presence_batch)
+            if total > 1:
+                log.info("Registered %s presences to the database.", total)
+            presence_batch.clear()
+
     @tasks.loop(seconds=10.0)
     async def bulk_insert_loop(self):
         async with self._batch_lock:
             await self.bulk_insert()
+
+    @bulk_insert_loop.before_loop
+    async def before_bulk_insert_loop(self):
+        await self.bot.wait_until_db_ready()
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):
@@ -102,7 +141,6 @@ class Tracking(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
-
         if after.nick and before.nick != after.nick:
             self._nick_batch.append(
                 {
@@ -118,8 +156,10 @@ class Tracking(commands.Cog):
 
         log.info("Loading database")
         nicks = await self.bot.db.fetch("SELECT * FROM nicks;")
+        presences = await self.bot.db.fetch("SELECT * FROM presences;")
 
         nick_batch = []
+        presence_batch = []
 
         log.info("Updating nicknames")
         for member in guild.members:
@@ -139,6 +179,19 @@ class Tracking(commands.Cog):
                     }
                 )
 
+            member_presences = [
+                presence
+                for presence in presences
+                if presence["user_id"] == member.id
+            ]
+            if not member_presences or member_presences[-1]["status"] != str(member.status):
+                presence_batch.append(
+                    {
+                        "user_id": member.id,
+                        "status": str(member.status)
+                    }
+                )
+
         query = """INSERT INTO nicks (user_id, guild_id, nick)
                    SELECT x.user_id, x.guild_id, x.nick
                    FROM jsonb_to_recordset($1::jsonb) AS
@@ -150,6 +203,17 @@ class Tracking(commands.Cog):
             total = len(nick_batch)
             if total > 1:
                 log.info("Registered %s nicks to the database.", total)
+
+        query = """INSERT INTO presences (user_id, status)
+                   SELECT x.user_id, x.status
+                   FROM jsonb_to_recordset($1::jsonb) AS
+                   x(user_id BIGINT, status TEXT)
+                """
+        if presence_batch:
+            await self.bot.db.execute(query, presence_batch)
+            total = len(presence_batch)
+            if total > 1:
+                log.info("Registered %s presences to the database.", total)
 
         log.info("Updating avatars and usernames")
         await self.bot.update_users()
@@ -171,6 +235,12 @@ class Tracking(commands.Cog):
                    WHERE names.user_id=$1;
                 """
         user_names = await self.bot.db.fetch(query, user.id)
+
+        query = """SELECT *
+                   FROM presences
+                   WHERE presences.user_id=$1;
+                """
+        user_presences = await self.bot.db.fetch(query, user.id)
 
         log.info("Updating database")
 
@@ -206,6 +276,12 @@ class Tracking(commands.Cog):
                         VALUES ($1, $2);
                     """
             await self.bot.db.execute(query, user.id, user.name)
+
+        if not user_presences or user_presences[-1]["status"] != str(user.status):
+            query = """INSERT INTO presences (user_id, status)
+                       VALUES ($1, $2);
+                    """
+            await self.bot.db.execute(query, user.id, str(user.status))
 
     @commands.command(name="names", description="View past usernames for a user")
     async def names(self, ctx, *, user: discord.Member = None):
@@ -376,6 +452,67 @@ class Tracking(commands.Cog):
 
         em.set_thumbnail(url=user.avatar_url)
         await ctx.send(embed=em)
+
+    @commands.command(name="pie", description="View a user's presence pie chart")
+    async def pie(self, ctx, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        await ctx.trigger_typing()
+
+        query = """SELECT *
+                   FROM presences
+                   WHERE presences.user_id=$1;
+                """
+        presences = await self.bot.db.fetch(query, user.id)
+
+        file = io.BytesIO()
+        partial = functools.partial(self.draw_pie)
+        image = await self.bot.loop.run_in_executor(None, partial, presences)
+        image.save(file, "PNG")
+        file.seek(0)
+
+        await ctx.send(file=discord.File(file, filename="pie.png"))
+
+    def draw_pie(self, presences):
+        presence_times = {"online": 0, "idle": 0, "dnd": 0, "offline": 0}
+        for counter, presence in enumerate(presences):
+            if len(presences) > counter+1:
+                next_time = presences[counter+1]["recorded_at"]
+            else:
+                next_time = datetime.datetime.utcnow()
+            time = next_time-presence["recorded_at"]
+            presence_times[presence["status"]] = presence_times[presence["status"]]+time.total_seconds()
+
+        total = sum(list(presence_times.values()))
+
+        online = (presence_times["online"]/total)
+        idle = (presence_times["idle"]/total)
+        dnd = (presence_times["dnd"]/total)
+        offline = (presence_times["offline"]/total)
+
+        width = 2048
+        height = 2048
+        shape = [(500, 500), (2000, 2000)]
+
+        image = Image.new("RGB", (width, height), (255, 255, 255))
+        drawing = ImageDraw.Draw(image)
+        drawing.pieslice(shape, start=0, end=online*360, fill="green")
+        drawing.pieslice(shape, start=online*360, end=(online+idle)*360, fill="yellow")
+        drawing.pieslice(shape, start=(online+idle)*360, end=(online+idle+dnd)*360, fill="red")
+        drawing.pieslice(shape, start=(online+idle+dnd)*360, end=360, fill="gray")
+
+
+        text = f"Online - {round(online*100, 2) or 0}% \nIdle - {round(idle*100, 2) or 0}% \nDo Not Disturb - {round(dnd*100, 2) or 0}% \nOffline - {round(offline*100, 2) or 0}%"
+        font = ImageFont.truetype("arial", 120)
+        drawing.text(xy=(120, 0), text=text, fill=(0, 0, 0), font=font, spacing=10)
+
+        drawing.rectangle([(10, 10), (110, 120)], fill="green")
+        drawing.rectangle([(10, 130), (110, 240)], fill="yellow")
+        drawing.rectangle([(10, 250), (110, 360)], fill="red")
+        drawing.rectangle([(10, 370), (110, 480)], fill="gray")
+
+        return image
 
 def setup(bot):
     bot.add_cog(Tracking(bot))
