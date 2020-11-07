@@ -225,7 +225,7 @@ class Tracking(commands.Cog):
             timedelta = datetime.datetime.utcnow() - recorded_at
             content += f"\n{name['name']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
 
-        await ctx.send(content)
+        await ctx.send(discord.utils.escape_markdown(content))
 
     @commands.command(name="nicks", description="View past nicknames for a user")
     async def nicks(self, ctx, *, user: discord.Member = None):
@@ -248,7 +248,7 @@ class Tracking(commands.Cog):
             timedelta = datetime.datetime.utcnow() - recorded_at
             content += f"\n{nick['nick']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
 
-        await ctx.send(content)
+        await ctx.send(discord.utils.escape_markdown(content))
 
     @commands.command(name="avatars", descripion="Avatars")
     async def avatars(self, ctx, *, user: discord.Member = None):
