@@ -343,7 +343,7 @@ class Tracking(commands.Cog):
         partial = functools.partial(self.draw_image, avatars)
         file = await self.bot.loop.run_in_executor(None, partial)
         file.seek(0)
-        await ctx.send(file=discord.File(fp=file, filename="image.png"))
+        await ctx.send(content=f"Avatars for {user}", file=discord.File(fp=file, filename="image.png"))
 
     def draw_image(self, avatars):
         file = io.BytesIO()
@@ -472,7 +472,7 @@ class Tracking(commands.Cog):
         image.save(file, "PNG")
         file.seek(0)
 
-        await ctx.send(file=discord.File(file, filename="pie.png"))
+        await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
 
     def draw_pie(self, presences):
         presence_times = {"online": 0, "idle": 0, "dnd": 0, "offline": 0}
