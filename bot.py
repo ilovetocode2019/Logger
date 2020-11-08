@@ -8,6 +8,7 @@ import os
 import logging
 import json
 import asyncio
+import datetime
 
 import config
 
@@ -24,6 +25,7 @@ class Logger(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix=config.prefix, intents=discord.Intents.all(), owner_ids=config.owner_ids)
         self.db_ready = asyncio.Event()
+        self.startup_time = datetime.datetime.utcnow()
 
         self.log = log
 
