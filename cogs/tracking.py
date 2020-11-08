@@ -442,7 +442,8 @@ class Tracking(commands.Cog):
 
         query = """SELECT *
                    FROM avatars
-                   WHERE avatars.user_id=$1;
+                   WHERE avatars.user_id=$1
+                   ORDER BY avatars.recorded_at DESC;
                 """
         avatars = await self.bot.db.fetch(query, user.id)
 
