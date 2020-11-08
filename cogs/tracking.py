@@ -467,8 +467,8 @@ class Tracking(commands.Cog):
         presences = await self.bot.db.fetch(query, user.id)
 
         file = io.BytesIO()
-        partial = functools.partial(self.draw_pie)
-        image = await self.bot.loop.run_in_executor(None, partial, presences)
+        partial = functools.partial(self.draw_pie, presences)
+        image = await self.bot.loop.run_in_executor(None, partial)
         image.save(file, "PNG")
         file.seek(0)
 
