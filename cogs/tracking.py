@@ -426,6 +426,8 @@ class Tracking(commands.Cog):
         if not user:
             user = ctx.author
 
+        await ctx.trigger_typing()
+
         query = """SELECT *
                    FROM names
                    WHERE names.user_id=$1;
@@ -438,20 +440,26 @@ class Tracking(commands.Cog):
                 """
         nicks = await self.bot.db.fetch(query, user.id, ctx.guild.id)
 
-        query = """SELECT COUNT(*)
+        query = """SELECT *
                    FROM avatars
                    WHERE avatars.user_id=$1;
                 """
-        avatars = await self.bot.db.fetchrow(query, user.id)
+        avatars = await self.bot.db.fetch(query, user.id)
+
+        partial = functools.partial(self.draw_image, avatars)
+        image = await self.bot.loop.run_in_executor(None, partial)
+        image.seek(0)
 
         em = discord.Embed(title=f"{user.display_name} ({user.id})")
+        em.set_image(url="attachment://avatars.png")
+        em.set_thumbnail(url=user.avatar_url)
+
         em.add_field(name="Names", value=", ".join([name["name"] for name in names]))
         if nicks:
             em.add_field(name="Nicks", value=", ".join([nick["nick"] for nick in nicks]))
-        em.add_field(name="Avatar Count", value=avatars["count"])
+        em.add_field(name="Avatar Count", value=len(avatars))
 
-        em.set_thumbnail(url=user.avatar_url)
-        await ctx.send(embed=em)
+        await ctx.send(embed=em, file=discord.File(image, filename="avatars.png"))
 
     @commands.command(name="pie", description="View a user's presence pie chart")
     async def pie(self, ctx, *, user: discord.Member = None):
