@@ -283,6 +283,15 @@ class Tracking(commands.Cog):
                     """
             await self.bot.db.execute(query, user.id, str(user.status))
 
+    @commands.Cog.listener()
+    async def on_member_leave(self, user):
+        shared = len([guild for guild in self.bot.guilds if user.id in [member.id for member in guild.members]])
+        if shared == 0:
+            query = """INSERT INTO presences (user_id, status)
+                       VALUES ($1, $2);
+                    """
+            await self.bot.db.execute(query, user.id, None)
+
     @commands.command(name="names", description="View past usernames for a user")
     async def names(self, ctx, *, user: discord.Member = None):
         if not user:
@@ -486,12 +495,13 @@ class Tracking(commands.Cog):
     def draw_pie(self, presences):
         presence_times = {"online": 0, "idle": 0, "dnd": 0, "offline": 0}
         for counter, presence in enumerate(presences):
-            if len(presences) > counter+1:
-                next_time = presences[counter+1]["recorded_at"]
-            else:
-                next_time = datetime.datetime.utcnow()
-            time = next_time-presence["recorded_at"]
-            presence_times[presence["status"]] = presence_times[presence["status"]]+time.total_seconds()
+            if presence["status"]:
+                if len(presences) > counter+1:
+                    next_time = presences[counter+1]["recorded_at"]
+                else:
+                    next_time = datetime.datetime.utcnow()
+                time = next_time-presence["recorded_at"]
+                presence_times[presence["status"]] = presence_times[presence["status"]]+time.total_seconds()
 
         total = sum(list(presence_times.values()))
 
