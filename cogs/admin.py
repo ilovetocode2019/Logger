@@ -8,7 +8,9 @@ import subprocess
 import sys
 import re
 import os
-
+import time
+import traceback
+from jishaku.codeblocks import codeblock_converter
 
 class Confirm(menus.Menu):
     def __init__(self, msg):
@@ -188,6 +190,38 @@ class Admin(commands.Cog):
                     statuses.append(("\N{WHITE HEAVY CHECK MARK}", module))
 
         await ctx.send("\n".join(f"{status} `{module}`" for status, module in statuses))
+
+    @commands.command(name="sql", description="Run some sql")
+    async def sql(self, ctx, *, code: codeblock_converter):
+        _, query = code
+
+        execute = query.count(";") > 1
+
+        if execute:
+            method = self.bot.db.execute
+        else:
+            method = self.bot.db.fetch
+
+        try:
+            start = time.time()
+            results = await method(query)
+            end = time.time()
+        except Exception as e:
+            full = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            return await ctx.send(f"```py\n{full}```")
+
+        if execute:
+            return await ctx.send(f"Executed in {int((end-start)*1000)}ms seconds: {str(results)}")
+
+        results = "\n".join([str(record) for record in results])
+
+        if not results:
+            return await ctx.send("No results to display")
+
+        try:
+            await ctx.send(f"Executed in {int((end-start)*1000)}ms seconds\n```{results}```")
+        except discord.HTTPException:
+            await ctx.send(file=discord.File(io.BytesIO(str(results).encode("utf-8")), filename="result.txt"))
 
     @commands.command(name="logout", description="Logs out and shuts down bot")
     async def logout(self, ctx):
