@@ -366,10 +366,7 @@ class Tracking(commands.Cog):
                     break
                 counter += 1
 
-            if columns > 3:
-                size = 4096
-            else:
-                size = 2048
+            size = 2048
 
             side_legnth = int(size/columns)
 
