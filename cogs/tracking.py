@@ -515,10 +515,10 @@ class Tracking(commands.Cog):
 
         image = Image.new("RGB", (width, height), (255, 255, 255))
         drawing = ImageDraw.Draw(image)
-        drawing.pieslice(shape, start=0, end=online*360, fill="green")
-        drawing.pieslice(shape, start=online*360, end=(online+idle)*360, fill="yellow")
-        drawing.pieslice(shape, start=(online+idle)*360, end=(online+idle+dnd)*360, fill="red")
-        drawing.pieslice(shape, start=(online+idle+dnd)*360, end=360, fill="gray")
+        drawing.pieslice(shape, start=0, end=round(online*360, 2), fill="green")
+        drawing.pieslice(shape, start=round(online*360, 2), end=round((online+idle)*360, 2), fill="yellow")
+        drawing.pieslice(shape, start=round((online+idle)*360, 2), end=round((online+idle+dnd)*360, 2), fill="red")
+        drawing.pieslice(shape, start=round((online+idle+dnd)*360, 2), end=round(360, 2), fill="gray")
 
 
         text = f"Online - {round(online*100, 2) or 0}% \nIdle - {round(idle*100, 2) or 0}% \nDo Not Disturb - {round(dnd*100, 2) or 0}% \nOffline - {round(offline*100, 2) or 0}%"
