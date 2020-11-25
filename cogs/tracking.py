@@ -532,5 +532,55 @@ class Tracking(commands.Cog):
 
         return image
 
+    @commands.command(name="chart", description="View a chart of your status over the past month")
+    async def status(self, ctx, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        await ctx.trigger_typing()
+
+        query = """SELECT *
+                   FROM presences
+                   WHERE presences.user_id=$1;
+                """
+        presences = await self.bot.db.fetch(query, user.id)
+        file = io.BytesIO()
+        partial = functools.partial(self.draw_chart, presences)
+        image = await self.bot.loop.run_in_executor(None, partial)
+        image.save(file, "PNG")
+        file.seek(0)
+
+        await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
+
+    def draw_chart(self, presences):
+        image = Image.new("RGBA", (2800, 3500), (255, 0, 0, 0))
+        drawing = ImageDraw.Draw(image, "RGBA")
+
+        for hour in range(4):
+            font = ImageFont.truetype("arial", 120)
+            drawing.text(xy=(hour*720, 1), text=f"{hour*6}:00 UTC", font=font)
+
+        time = datetime.datetime.utcnow()-datetime.timedelta(days=30)
+        time = datetime.datetime(year=time.year, month=time.month, day=time.day+1)
+        for row in range(5, 35):
+            for pixel in range(1, 2881):
+                last = None
+                color = None
+                keys = {"online": "green", "idle": "yellow", "dnd": "red", "offline": "gray"}
+                for presence in presences:
+                    if presence["recorded_at"] > time:
+                        if last and last["status"]:
+                            color = keys[last["status"]]
+                        else:
+                            color = None
+                        break
+                    last = presence
+
+                if color:
+                    drawing.rectangle([(pixel, row*100), (pixel+1, (row*100)+99)], fill=color)
+                time += datetime.timedelta(seconds=30)
+
+        return image
+
 def setup(bot):
     bot.add_cog(Tracking(bot))
