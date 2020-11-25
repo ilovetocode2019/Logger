@@ -579,7 +579,7 @@ class Tracking(commands.Cog):
                         break
                     last = presence
 
-                if not found and presences[-1]["recorded_at"] > time:
+                if not found and time < datetime.datetime.utcnow():
                     color = keys[presences[-1]["status"]]
 
                 if color:
