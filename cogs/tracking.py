@@ -553,19 +553,17 @@ class Tracking(commands.Cog):
         await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
 
     def draw_chart(self, presences):
-        image = Image.new("RGBA", (2800, 3500), (255, 0, 0, 0))
+        image = Image.new("RGB", (3380, 3200), (255, 255, 255))
         drawing = ImageDraw.Draw(image, "RGBA")
-
-        for hour in range(4):
-            font = ImageFont.truetype("arial", 120)
-            drawing.text(xy=(hour*720, 1), text=f"{hour*6}:00 UTC", font=font)
+        font = ImageFont.truetype("arial", 100)
 
         time = datetime.datetime.utcnow()-datetime.timedelta(days=30)
         time = datetime.datetime(year=time.year, month=time.month, day=time.day+1)
         keys = {"online": "green", "idle": "yellow", "dnd": "red", "offline": "gray"}
+        months = {1: "Jan", 2: "Feb", 3: "Mar", 4: "April", 5: "May", 6: "June", 7: "July", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
-        for row in range(5, 35):
-            for pixel in range(1, 2881):
+        for row in range(2, 32):
+            for pixel in range(500, 3381):
                 last = None
                 color = None
                 found = None
@@ -585,6 +583,14 @@ class Tracking(commands.Cog):
                 if color:
                     drawing.rectangle([(pixel, row*100), (pixel+1, (row*100)+99)], fill=color)
                 time += datetime.timedelta(seconds=30)
+
+            drawing.text(xy=(1, row*100), text=f"{months[time.month]} {time.day}", fill="black", font=font)
+            drawing.line(xy=[(1, row*100), (3380, row*100)], fill="gray", width=5)
+
+        for hour in range(24):
+            if hour%6 == 0:
+                drawing.text(xy=((hour*120)+500, 1), text=f"{hour}:00 UTC", fill="black", font=font)
+            drawing.line(xy=[((hour*120)+500, 200), ((hour*120)+500, 3500)], fill="gray", width=5)
 
         return image
 
