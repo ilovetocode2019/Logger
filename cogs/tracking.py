@@ -585,12 +585,12 @@ class Tracking(commands.Cog):
                 time += datetime.timedelta(seconds=30)
 
             drawing.text(xy=(1, row*100), text=f"{months[time.month]} {time.day}", fill="black", font=font)
-            drawing.line(xy=[(1, row*100), (3380, row*100)], fill="gray", width=5)
+            drawing.line(xy=[(1, row*100), (3380, row*100)], fill=(64, 64, 64), width=5)
 
         for hour in range(24):
             if hour%6 == 0:
                 drawing.text(xy=((hour*120)+500, 1), text=f"{hour}:00 UTC", fill="black", font=font)
-            drawing.line(xy=[((hour*120)+500, 200), ((hour*120)+500, 3500)], fill="gray", width=5)
+            drawing.line(xy=[((hour*120)+500, 200), ((hour*120)+500, 3500)], fill=(64, 64, 64), width=5)
 
         return image
 
