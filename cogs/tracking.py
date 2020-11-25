@@ -584,7 +584,7 @@ class Tracking(commands.Cog):
                     drawing.rectangle([(pixel, row*100), (pixel+1, (row*100)+99)], fill=color)
                 time += datetime.timedelta(seconds=30)
 
-            drawing.text(xy=(1, row*100), text=f"{months[time.month]} {time.day}", fill="black", font=font)
+            drawing.text(xy=(1, row*100), text=f"{months[(time-datetime.timedelta(days=1)).month]} {(time-datetime.timedelta(days=1)).day}", fill="black", font=font)
             drawing.line(xy=[(1, row*100), (3380, row*100)], fill=(64, 64, 64), width=5)
 
         for hour in range(24):
