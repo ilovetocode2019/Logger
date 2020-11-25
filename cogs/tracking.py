@@ -562,19 +562,25 @@ class Tracking(commands.Cog):
 
         time = datetime.datetime.utcnow()-datetime.timedelta(days=30)
         time = datetime.datetime(year=time.year, month=time.month, day=time.day+1)
+        keys = {"online": "green", "idle": "yellow", "dnd": "red", "offline": "gray"}
+
         for row in range(5, 35):
             for pixel in range(1, 2881):
                 last = None
                 color = None
-                keys = {"online": "green", "idle": "yellow", "dnd": "red", "offline": "gray"}
+                found = None
                 for presence in presences:
                     if presence["recorded_at"] > time:
                         if last and last["status"]:
                             color = keys[last["status"]]
                         else:
                             color = None
+                        found = True
                         break
                     last = presence
+
+                if not found and presences[-1]["recorded_at"] > time:
+                    color = keys[presences[-1]["status"]]
 
                 if color:
                     drawing.rectangle([(pixel, row*100), (pixel+1, (row*100)+99)], fill=color)
