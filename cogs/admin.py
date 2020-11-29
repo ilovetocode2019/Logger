@@ -10,6 +10,7 @@ import re
 import os
 import time
 import traceback
+import io
 import pkg_resources
 from jishaku.codeblocks import codeblock_converter
 
