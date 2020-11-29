@@ -167,6 +167,8 @@ class Logger(commands.Bot):
     async def on_ready(self):
         log.info(f"Logged in as {self.user.name} - {self.user.id}")
 
+        self.console = bot.get_channel(config.console)
+
         log.info("Loading database")
         nicks = await self.db.fetch("SELECT * FROM nicks;")
         presences = await self.db.fetch("SELECT * FROM presences;")
