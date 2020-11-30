@@ -40,7 +40,7 @@ class Meta(commands.Cog):
             em = discord.Embed(title=":warning: Error", description="", color=discord.Color.gold(), timestamp=datetime.datetime.utcnow())
             em.description += f"\nCommand: `{ctx.command}`"
             em.description += f"\nLink: [Jump]({ctx.message.jump_url})"
-            em.description += f"\n\n```py\n{e}```\n"
+            em.description += f"\n\n```py\n{error}```\n"
 
             await self.bot.console.send(embed=em)
 
