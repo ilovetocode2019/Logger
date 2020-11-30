@@ -36,7 +36,7 @@ class Meta(commands.Cog):
 
         await ctx.send(f"```py\n{error}\n```")
 
-        if isinstance(e, commands.CommandInvokeError):
+        if isinstance(error, commands.CommandInvokeError):
             em = discord.Embed(title=":warning: Error", description="", color=discord.Color.gold(), timestamp=datetime.datetime.utcnow())
             em.description += f"\nCommand: `{ctx.command}`"
             em.description += f"\nLink: [Jump]({ctx.message.jump_url})"
