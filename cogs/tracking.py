@@ -6,6 +6,7 @@ import logging
 import asyncpg
 import humanize
 import datetime
+import calendar
 import io
 import functools
 import os
@@ -558,7 +559,14 @@ class Tracking(commands.Cog):
         font = ImageFont.truetype("arial", 100)
 
         time = datetime.datetime.utcnow()-datetime.timedelta(days=30)
-        time = datetime.datetime(year=time.year, month=time.month, day=time.day+1)
+
+        days = calendar.monthrange(time.year, time.month)[1]
+        if days >= time.day:
+            time = time.replace(month=time.month+1, day=(time.day - int(days))+1)
+        else:
+            time = time.replace(day=time.day+1)
+
+        time = datetime.datetime(year=time.year, month=time.month, day=time.day)
         keys = {"online": "green", "idle": "yellow", "dnd": "red", "offline": "gray"}
         months = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
