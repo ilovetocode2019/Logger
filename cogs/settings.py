@@ -75,7 +75,7 @@ class Settings(commands.Cog):
 
         await self.bot.db.execute(query, ctx.author.id, theme_id)
 
-        self.fetch_config.invalidate(ctx.author.id)
+        self.fetch_config.invalidate(self, ctx.author.id)
 
         await ctx.send(f"Set theme to `{theme}`")
 

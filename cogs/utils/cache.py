@@ -69,7 +69,7 @@ def _wrap_value(value):
     return func()
 
 
-class Cache:
+def cache(max_len: int = 128, *, ignore_kwargs=False):
     """A cache that wraps a func and uses :class:`LRUDict` to store the returning value.
 
     Don't create an instance of this directly.
@@ -124,98 +124,92 @@ class Cache:
         Whether to ignore kwargs when resolving the key
     """
 
-    def __init__(self, func, max_len: int = 128, ignore_kwargs=False):
-        self.func = func
-        self.ignore_kwargs = ignore_kwargs
-        self.cache = LRUDict(max_len)
-
-    def __len__(self):
-        return len(self.cache)
-
-    def _resolve_key(self, args, kwargs):
-        key = [f"{self.func.__module__}.{self.func.__name__}"]
-        key.extend(repr(a) for a in args)
-
-        if not self.ignore_kwargs:
-            for k, v in kwargs.items():
-                key.append(repr(k))
-                key.append(repr(v))
-
-        return ":".join(key)
-
-    def invalidate(self, *args, **kwargs):
-        """Remove an item from the cache with the provided args and kwargs or the entire cache if none provided.
-
-        Returns
-        --------
-        :class:`bool`
-            Whether or not the invalidate succeeded.
-        """
-        if not args and not kwargs:
-            self.cache.clear()
-            return True
-
-        key = self._resolve_key(args, kwargs)
-
-        try:
-            del self.cache[key]
-            return True
-
-        except KeyError:
-            return False
-
-    def invalidate_containing(self, key):
-        """Invalidate all items from the cache containing the key provided.
-
-        Parameters
-        -----------
-        key: :class:`str`
-            A string to use to invalidate items in the dict.
-        """
-        to_remove = []
-
-        for k in self.cache.keys():
-            if key in k:
-                to_remove.append(k)
-
-        for key in to_remove:
-            try:
-                del self.cache[key]
-            except KeyError:
-                continue
-
-    def __call__(self, *args, **kwargs):
-        key = self._resolve_key(args, kwargs)
-
-        try:
-            value = self.cache[key]
-
-        except KeyError:
-            # Add the value to the cache since it isn't there
-            value = self.func(*args, **kwargs)
-
-            if inspect.isawaitable(value):
-                return _prepare_coro(value, self.cache, key)
-
-            self.cache[key] = value
-            return value
-
-        else:
-            if asyncio.iscoroutinefunction(self.func):
-                return _wrap_value(value)
-            return value
-
-
-def cache(*args, **kwargs):
-    """Decorator that turns a function into a :class:`Cache`."""
-
     def decorator(func):
-        cache = Cache(func, *args, **kwargs)
+        _cache = LRUDict(max_len)
+
+        def _resolve_key(args, kwargs):
+            def _true_repr(o):
+                if o.__class__.__repr__ is object.__repr__:
+                    return f"<{o.__class__.__module__}.{o.__class__.__name__}>"
+                return repr(o)
+
+            key = [f"{func.__module__}.{func.__name__}"]
+            key.extend(_true_repr(a) for a in args)
+
+            if not ignore_kwargs:
+                for k, v in kwargs.items():
+                    key.append(repr(k))
+                    key.append(repr(v))
+
+            return ":".join(key)
+
+        def invalidate(*args, **kwargs):
+            """Remove an item from the cache with the provided args and kwargs or the entire cache if none provided.
+
+            Returns
+            --------
+            :class:`bool`
+                Whether or not the invalidate succeeded.
+            """
+            if not args and not kwargs:
+                _cache.clear()
+                return True
+
+            key = _resolve_key(args, kwargs)
+
+            try:
+                del _cache[key]
+                return True
+
+            except KeyError:
+                return False
+
+        def invalidate_containing(key):
+            """Invalidate all items from the cache containing the key provided.
+
+            Parameters
+            -----------
+            key: :class:`str`
+                A string to use to invalidate items in the dict.
+            """
+            to_remove = []
+
+            for k in _cache.keys():
+                if key in k:
+                    to_remove.append(k)
+
+            for key in to_remove:
+                try:
+                    del _cache[key]
+                except KeyError:
+                    continue
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            return cache(*args, **kwargs)
+            key = _resolve_key(args, kwargs)
 
+            try:
+                value = _cache[key]
+
+            except KeyError:
+                # Add the value to the cache since it isn't there
+                value = func(*args, **kwargs)
+
+                if inspect.isawaitable(value):
+                    return _prepare_coro(value, _cache, key)
+
+                _cache[key] = value
+                return value
+
+            else:
+                if asyncio.iscoroutinefunction(func):
+                    return _wrap_value(value)
+                return value
+
+        wrapper.invalidate = invalidate
+        wrapper.invalidate_containing = invalidate_containing
+        wrapper.cache = _cache
+        wrapper.get_key = lambda *args, **kwargs: _resolve_key(args, kwargs)
         return wrapper
 
     return decorator
