@@ -31,7 +31,7 @@ class Logger(commands.Bot):
 
         self.loop.create_task(self.prepare_bot())
 
-        self.cogs_to_add = ["cogs.admin", "cogs.meta", "cogs.tracking"]
+        self.cogs_to_add = ["cogs.admin", "cogs.meta", "cogs.tracking", "cogs.settings"]
         self.load_extension("jishaku")
         for cog in self.cogs_to_add:
             self.load_extension(cog)
@@ -91,6 +91,11 @@ class Logger(commands.Bot):
                    guild_id BIGINT,
                    status TEXT,
                    recorded_at TIMESTAMP DEFAULT (now() at time zone 'utc')
+                   );
+
+                   CREATE TABLE IF NOT EXISTS user_config (
+                   id BIGINT PRIMARY KEY,
+                   theme INTEGER DEFAULT 0
                    );
                 """
         await self.db.execute(query)
