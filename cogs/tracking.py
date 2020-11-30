@@ -12,6 +12,8 @@ import functools
 import os
 from PIL import Image, ImageDraw, ImageFont
 
+from .utils.theme import get_theme
+
 log = logging.getLogger("logger.tracking")
 
 class Tracking(commands.Cog):
@@ -484,15 +486,23 @@ class Tracking(commands.Cog):
                 """
         presences = await self.bot.db.fetch(query, user.id)
 
+        settings = self.bot.get_cog("Settings")
+        if settings:
+            config = await settings.fetch_config(ctx.author.id)
+            theme = config.theme if config else get_theme(None)
+
+        else:
+            theme = get_theme(None)
+
         file = io.BytesIO()
-        partial = functools.partial(self.draw_pie, presences)
+        partial = functools.partial(self.draw_pie, presences, theme)
         image = await self.bot.loop.run_in_executor(None, partial)
         image.save(file, "PNG")
         file.seek(0)
 
         await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
 
-    def draw_pie(self, presences):
+    def draw_pie(self, presences, theme):
         presence_times = {"online": 0, "idle": 0, "dnd": 0, "offline": 0}
         for counter, presence in enumerate(presences):
             if presence["status"]:
@@ -514,7 +524,7 @@ class Tracking(commands.Cog):
         height = 2048
         shape = [(500, 500), (2000, 2000)]
 
-        image = Image.new("RGB", (width, height), (255, 255, 255))
+        image = Image.new("RGB", (width, height), theme.background)
         drawing = ImageDraw.Draw(image)
         drawing.pieslice(shape, start=0, end=round(online*360, 2), fill="green")
         drawing.pieslice(shape, start=round(online*360, 2), end=round((online+idle)*360, 2), fill="yellow")
@@ -524,7 +534,7 @@ class Tracking(commands.Cog):
 
         text = f"Online - {round(online*100, 2) or 0}% \nIdle - {round(idle*100, 2) or 0}% \nDo Not Disturb - {round(dnd*100, 2) or 0}% \nOffline - {round(offline*100, 2) or 0}%"
         font = ImageFont.truetype("arial", 120)
-        drawing.text(xy=(120, 0), text=text, fill=(0, 0, 0), font=font, spacing=10)
+        drawing.text(xy=(120, 0), text=text, fill=theme.primary, font=font, spacing=10)
 
         drawing.rectangle([(10, 10), (110, 120)], fill="green")
         drawing.rectangle([(10, 130), (110, 240)], fill="yellow")
@@ -545,16 +555,25 @@ class Tracking(commands.Cog):
                    WHERE presences.user_id=$1;
                 """
         presences = await self.bot.db.fetch(query, user.id)
+
+        settings = self.bot.get_cog("Settings")
+        if settings:
+            config = await settings.fetch_config(ctx.author.id)
+            theme = config.theme if config else get_theme(None)
+
+        else:
+            theme = get_theme(None)
+
         file = io.BytesIO()
-        partial = functools.partial(self.draw_chart, presences)
+        partial = functools.partial(self.draw_chart, presences, theme)
         image = await self.bot.loop.run_in_executor(None, partial)
         image.save(file, "PNG")
         file.seek(0)
 
         await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
 
-    def draw_chart(self, presences):
-        image = Image.new("RGB", (3480, 3200), (255, 255, 255))
+    def draw_chart(self, presences, theme):
+        image = Image.new("RGB", (3480, 3200), theme.background)
         drawing = ImageDraw.Draw(image, "RGBA")
         font = ImageFont.truetype("arial", 100)
 
@@ -592,13 +611,13 @@ class Tracking(commands.Cog):
                     drawing.rectangle([(pixel, row*100), (pixel+1, (row*100)+99)], fill=color)
                 time += datetime.timedelta(seconds=30)
 
-            drawing.text(xy=(1, row*100), text=f"{(time-datetime.timedelta(days=1)).strftime('%A')[:3]}, {months[(time-datetime.timedelta(days=1)).month]} {(time-datetime.timedelta(days=1)).day}", fill="black", font=font)
-            drawing.line(xy=[(1, row*100), (3480, row*100)], fill=(64, 64, 64), width=5)
+            drawing.text(xy=(1, row*100), text=f"{(time-datetime.timedelta(days=1)).strftime('%A')[:3]}, {months[(time-datetime.timedelta(days=1)).month]} {(time-datetime.timedelta(days=1)).day}", fill=theme.primary, font=font)
+            drawing.line(xy=[(1, row*100), (3480, row*100)], fill=theme.secondary, width=5)
 
         for hour in range(24):
             if hour%6 == 0:
-                drawing.text(xy=((hour*120)+600, 1), text=f"{hour}:00 UTC", fill="black", font=font)
-            drawing.line(xy=[((hour*120)+600, 200), ((hour*120)+600, 3500)], fill=(64, 64, 64), width=5)
+                drawing.text(xy=((hour*120)+600, 1), text=f"{hour}:00 UTC", fill=theme.primary, font=font)
+            drawing.line(xy=[((hour*120)+600, 200), ((hour*120)+600, 3500)], fill=theme.secondary, width=5)
 
         return image
 
