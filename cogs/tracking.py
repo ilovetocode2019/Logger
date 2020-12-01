@@ -580,7 +580,7 @@ class Tracking(commands.Cog):
         time = datetime.datetime.utcnow()-datetime.timedelta(days=30)
 
         days = calendar.monthrange(time.year, time.month)[1]
-        if days >= time.day:
+        if days <= time.day:
             time = time.replace(month=time.month+1, day=(time.day - int(days))+1)
         else:
             time = time.replace(day=time.day+1)
@@ -610,6 +610,10 @@ class Tracking(commands.Cog):
                 if color:
                     drawing.rectangle([(pixel, row*100), (pixel+1, (row*100)+99)], fill=color)
                 time += datetime.timedelta(seconds=30)
+
+                days = calendar.monthrange(time.year, time.month)[1]
+                if days < time.day:
+                    time = time.replace(month=time.month+1, day=(time.day - int(days))+1)
 
             drawing.text(xy=(1, row*100), text=f"{(time-datetime.timedelta(days=1)).strftime('%A')[:3]}, {months[(time-datetime.timedelta(days=1)).month]} {(time-datetime.timedelta(days=1)).day}", fill=theme.primary, font=font)
             drawing.line(xy=[(1, row*100), (3480, row*100)], fill=theme.secondary, width=5)
