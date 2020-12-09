@@ -248,6 +248,10 @@ class Logger(commands.Bot):
     def run(self):
         super().run(config.token)
 
+    async def logout(self):
+        await self.db.close()
+        await self.session.close()
+        await super().logout()
 
 bot = Logger()
 bot.run()
