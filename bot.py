@@ -62,6 +62,7 @@ class Logger(commands.Bot):
         self.db = await asyncpg.create_pool(config.database_uri, init=init)
 
         log.info("Initiating database")
+
         query = """CREATE TABLE IF NOT EXISTS avatars (
                    id SERIAL PRIMARY KEY,
                    user_id BIGINT,

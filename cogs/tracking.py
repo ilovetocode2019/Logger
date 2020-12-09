@@ -107,7 +107,7 @@ class Tracking(commands.Cog):
                 log.info("Registered %s presences to the database.", total)
             presence_batch.clear()
 
-    @tasks.loop(seconds=10.0)
+    @tasks.loop(seconds=20.0)
     async def bulk_insert_loop(self):
         async with self._batch_lock:
             await self.bulk_insert()
