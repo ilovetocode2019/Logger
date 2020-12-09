@@ -14,6 +14,8 @@ import io
 import pkg_resources
 from jishaku.codeblocks import codeblock_converter
 
+from .utils import formats
+
 class Confirm(menus.Menu):
     def __init__(self, msg):
         super().__init__(timeout=30.0, delete_message_after=True)
@@ -216,13 +218,19 @@ class Admin(commands.Cog):
             full = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             return await ctx.send(f"```py\n{full}```")
 
+        if not results:
+            return await ctx.send("No results to display")
+
         if execute:
             return await ctx.send(f"Executed in {int((end-start)*1000)}ms: {str(results)}")
 
-        results = "\n".join([str(record) for record in results])
+        columns = list(results[0].keys())
+        rows = [list(row.values()) for row in results]
 
-        if not results:
-            return await ctx.send("No results to display")
+        table = formats.Tabulate()
+        table.add_columns(columns)
+        table.add_rows(rows)
+        results = str(table)
 
         try:
             await ctx.send(f"Executed in {int((end-start)*1000)}ms\n```{results}```")
