@@ -103,8 +103,6 @@ class Logger(commands.Bot):
         await self.db.execute(query)
 
     async def update_users(self):
-        log.info("Querying user avatar and name changes")
-
         names = await self.db.fetch("SELECT * FROM names;")
         avatars = await self.db.fetch("SELECT * FROM avatars;")
 
@@ -243,6 +241,7 @@ class Logger(commands.Bot):
         else:
             log.info("No work needed to presences")
 
+        log.info("Querying user avatar and name changes")
         await self.update_users()
 
         log.info("Database is now up-to-date")
