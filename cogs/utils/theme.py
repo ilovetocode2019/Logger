@@ -13,7 +13,7 @@ DARK = Theme("dark", (255, 255, 255), (185, 185, 185), (54, 57, 63))
 LIGHT = Theme("light", (0, 0, 0), (64, 64, 64), (255, 255, 255))
 
 THEME_MAPPING = {
-    None: LIGHT,  # default theme
+    None: DARK,  # default theme
     0: DARK,
     1: LIGHT
 }
