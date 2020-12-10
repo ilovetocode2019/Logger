@@ -160,7 +160,7 @@ class Tracking(commands.Cog):
         nick_batch = []
         presence_batch = []
 
-        log.info("Updating nicknames")
+        log.info("Querying nicks and presences")
         for member in guild.members:
             member_nicks = [
                 nick
@@ -196,11 +196,12 @@ class Tracking(commands.Cog):
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, guild_id BIGINT, nick TEXT)
                 """
-
         if nick_batch:
             await self.bot.db.execute(query, nick_batch)
             total = len(nick_batch)
             log.info("Registered %s to the database.", format(formats.plural(total), "nick"))
+        else:
+            log.info("No work needed for nicks")
 
         query = """INSERT INTO presences (user_id, status)
                    SELECT x.user_id, x.status
@@ -211,8 +212,10 @@ class Tracking(commands.Cog):
             await self.bot.db.execute(query, presence_batch)
             total = len(presence_batch)
             log.info("Registered %s to the database.", format(formats.plural(total), "presence"))
+        else:
+            log.info("No work needed for presences")
 
-        log.info("Updating avatars and usernames")
+        log.info("Querying avatars and names")
         await self.bot.update_users()
 
     @commands.Cog.listener()

@@ -180,7 +180,7 @@ class Logger(commands.Bot):
 
         log.info("Preparing database")
 
-        log.info("Querying member, nick, and presence changes")
+        log.info("Querying nick, and presence changes")
 
         nick_batch = []
         presence_batch = []
@@ -241,7 +241,7 @@ class Logger(commands.Bot):
         else:
             log.info("No work needed to presences")
 
-        log.info("Querying user avatar and name changes")
+        log.info("Querying avatar and name changes")
         await self.update_users()
 
         log.info("Database is now up-to-date")
