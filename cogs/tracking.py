@@ -63,6 +63,7 @@ class Tracking(commands.Cog):
 
         if self._avatar_batch:
             await self.bot.db.execute(query, self._avatar_batch)
+            total = len(self._avatar_batch)
             log.info("Registered %s to the database.", format(formats.plural(total), "avatar"))
             self._avatar_batch.clear()
 
