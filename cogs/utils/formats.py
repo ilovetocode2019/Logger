@@ -1,3 +1,13 @@
+class plural:
+    def __init__(self, value):
+        self.value = value
+
+    def __format__(self, format_spec):
+        if self.value == 1:
+            return f"{self.value} {format_spec}"
+        else:
+            return f"{self.value} {format_spec}s"
+
 class Tabulate:
     def __init__(self):
         self.widths = []

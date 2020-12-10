@@ -12,6 +12,8 @@ import datetime
 
 import config
 
+from cogs.utils import formats
+
 logging.basicConfig(
     level=logging.INFO,
     format="(%(asctime)s) %(levelname)s %(message)s",
@@ -150,7 +152,7 @@ class Logger(commands.Bot):
         if avatar_batch:
             await self.db.execute(query, avatar_batch)
             total = len(avatar_batch)
-            log.info("Registered %s avatar(s) to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "avatar"))
         else:
             log.info("No work needed for avatars")
 
@@ -163,7 +165,7 @@ class Logger(commands.Bot):
         if name_batch:
             await self.db.execute(query, name_batch)
             total = len(avatar_batch)
-            log.info("Registered %s name(s) to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "name"))
         else:
             log.info("No work needed for names")
 
@@ -224,12 +226,12 @@ class Logger(commands.Bot):
         if nick_batch:
             await self.db.execute(query, nick_batch)
             total = len(nick_batch)
-            log.info("Registered %s nick(s) to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "nick"))
         else:
             log.info("No work needed for nicks")
 
-        query = """INSERT INTO presences (user_id, guild_id, status)
-                   SELECT x.user_id, x.guild_id, x.status
+        query = """INSERT INTO presences (user_id, status)
+                   SELECT x.user_id, x.status
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, guild_id BIGINT, status TEXT)
                 """
@@ -237,7 +239,7 @@ class Logger(commands.Bot):
         if presence_batch:
             await self.db.execute(query, presence_batch)
             total = len(presence_batch)
-            log.info("Registered %s presence(s) to database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "presence"))
         else:
             log.info("No work needed to presences")
 

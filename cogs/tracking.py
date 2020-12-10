@@ -13,6 +13,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 
 from .utils.theme import get_theme
+from .utils import formats
 
 log = logging.getLogger("logger.tracking")
 
@@ -62,9 +63,7 @@ class Tracking(commands.Cog):
 
         if self._avatar_batch:
             await self.bot.db.execute(query, self._avatar_batch)
-            total = len(self._avatar_batch)
-            if total > 1:
-                log.info("Registered %s avatars to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "avatar"))
             self._avatar_batch.clear()
 
         query = """INSERT INTO names (user_id, name)
@@ -76,8 +75,7 @@ class Tracking(commands.Cog):
         if self._name_batch:
             await self.bot.db.execute(query, self._name_batch)
             total = len(self._name_batch)
-            if total > 1:
-                log.info("Registered %s names to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "name"))
             self._name_batch.clear()
 
         query = """INSERT INTO nicks (user_id, guild_id, nick)
@@ -89,9 +87,7 @@ class Tracking(commands.Cog):
         if self._nick_batch:
             await self.bot.db.execute(query, self._nick_batch)
             total = len(self._nick_batch)
-            if total > 1:
-                log.info("Registered %s nicks to the database.", total)
-
+            log.info("Registered %s to the database.", format(formats.plural(total), "nick"))
             self._nick_batch.clear()
 
         query = """INSERT INTO presences (user_id, status)
@@ -103,8 +99,7 @@ class Tracking(commands.Cog):
         if presence_batch:
             await self.bot.db.execute(query, presence_batch)
             total = len(presence_batch)
-            if total > 1:
-                log.info("Registered %s presences to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "presence"))
             presence_batch.clear()
 
     @tasks.loop(seconds=20.0)
@@ -204,8 +199,7 @@ class Tracking(commands.Cog):
         if nick_batch:
             await self.bot.db.execute(query, nick_batch)
             total = len(nick_batch)
-            if total > 1:
-                log.info("Registered %s nicks to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "nick"))
 
         query = """INSERT INTO presences (user_id, status)
                    SELECT x.user_id, x.status
@@ -215,8 +209,7 @@ class Tracking(commands.Cog):
         if presence_batch:
             await self.bot.db.execute(query, presence_batch)
             total = len(presence_batch)
-            if total > 1:
-                log.info("Registered %s presences to the database.", total)
+            log.info("Registered %s to the database.", format(formats.plural(total), "presence"))
 
         log.info("Updating avatars and usernames")
         await self.bot.update_users()
