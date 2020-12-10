@@ -89,7 +89,6 @@ class Logger(commands.Bot):
                    CREATE TABLE IF NOT EXISTS presences (
                    id SERIAL PRIMARY KEY,
                    user_id BIGINT,
-                   guild_id BIGINT,
                    status TEXT,
                    recorded_at TIMESTAMP DEFAULT (now() at time zone 'utc')
                    );
