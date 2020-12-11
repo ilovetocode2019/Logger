@@ -105,7 +105,9 @@ class Tracking(commands.Cog):
 
     @bulk_insert_loop.before_loop
     async def before_bulk_insert_loop(self):
+        log.info("Waiting until the database is ready to start the bulk insert loop")
         await self.bot.wait_until_db_ready()
+        log.info("Starting bulk insert loop")
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
@@ -115,11 +117,14 @@ class Tracking(commands.Cog):
         nicks = await self.bot.db.fetch("SELECT * FROM nicks;")
         presences = await self.bot.db.fetch("SELECT * FROM presences;")
 
+        log.info("Loading members")
+        members = list(guild.members)
+
         nick_batch = []
         presence_batch = []
 
         log.info("Querying nicks and presences")
-        for member in guild.members:
+        for member in members:
             member_nicks = [
                 nick
                 for nick in nicks
@@ -174,7 +179,7 @@ class Tracking(commands.Cog):
             log.info("No work needed for presences")
 
         log.info("Querying avatars and names")
-        await self.bot.update_users(guild.members)
+        await self.bot.update_users(members)
 
     @commands.Cog.listener()
     async def on_member_join(self, user):
