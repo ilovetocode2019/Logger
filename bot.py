@@ -102,14 +102,14 @@ class Logger(commands.Bot):
                 """
         await self.db.execute(query)
 
-    async def update_users(self):
+    async def update_users(self, users):
         names = await self.db.fetch("SELECT * FROM names;")
         avatars = await self.db.fetch("SELECT * FROM avatars;")
 
         avatar_batch = []
         name_batch = []
 
-        for user in bot.users:
+        for user in users:
             user_avatars = [
                 avatar for avatar in avatars if avatar["user_id"] == user.id
             ]
@@ -146,7 +146,6 @@ class Logger(commands.Bot):
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, filename TEXT, hash TEXT)
                 """
-
         if avatar_batch:
             await self.db.execute(query, avatar_batch)
             total = len(avatar_batch)
@@ -159,7 +158,6 @@ class Logger(commands.Bot):
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, name TEXT)
                 """
-
         if name_batch:
             await self.db.execute(query, name_batch)
             total = len(avatar_batch)
@@ -178,6 +176,10 @@ class Logger(commands.Bot):
         nicks = await self.db.fetch("SELECT * FROM nicks;")
         presences = await self.db.fetch("SELECT * FROM presences;")
 
+        log.info("Loading all members and users")
+        users = list(bot.users)
+        members = list(self.get_all_members())
+
         log.info("Preparing database")
 
         log.info("Querying nick, and presence changes")
@@ -185,7 +187,7 @@ class Logger(commands.Bot):
         nick_batch = []
         presence_batch = []
 
-        for member in self.get_all_members():
+        for member in members:
             member_nicks = [
                 nick
                 for nick in nicks
@@ -220,7 +222,6 @@ class Logger(commands.Bot):
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, guild_id BIGINT, nick TEXT)
                 """
-
         if nick_batch:
             await self.db.execute(query, nick_batch)
             total = len(nick_batch)
@@ -233,7 +234,6 @@ class Logger(commands.Bot):
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, guild_id BIGINT, status TEXT)
                 """
-
         if presence_batch:
             await self.db.execute(query, presence_batch)
             total = len(presence_batch)
@@ -242,8 +242,7 @@ class Logger(commands.Bot):
             log.info("No work needed to presences")
 
         log.info("Querying avatar and name changes")
-        await self.update_users()
-
+        await self.update_users(users)
         log.info("Database is now up-to-date")
 
     def run(self):
