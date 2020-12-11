@@ -474,7 +474,7 @@ class Tracking(commands.Cog):
         query = """SELECT *
                    FROM presences
                    WHERE presences.user_id=$1
-                   ORDER BY presences.recorded_at DESC;
+                   ORDER BY presences.recorded_at ASC;
                 """
         presences = await self.bot.db.fetch(query, user.id)
 
@@ -545,7 +545,7 @@ class Tracking(commands.Cog):
         query = """SELECT *
                    FROM presences
                    WHERE presences.user_id=$1
-                   ORDER BY presences.recorded_at DESC;
+                   ORDER BY presences.recorded_at ASC;
                 """
         presences = await self.bot.db.fetch(query, user.id)
 
