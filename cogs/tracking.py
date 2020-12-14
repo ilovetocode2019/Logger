@@ -426,49 +426,6 @@ class Tracking(commands.Cog):
 
         await ctx.send(content=f"Hash: {avatar['hash']}", embed=em, file=discord.File(f"images/{avatar['filename']}", filename="image.png"))
 
-    @commands.command(name="userinfo", description="Get info on a user", aliases=["ui", "whois"])
-    async def userinfo(self, ctx, *, user: discord.Member = None):
-        if not user:
-            user = ctx.author
-
-        await ctx.trigger_typing()
-
-        query = """SELECT *
-                   FROM names
-                   WHERE names.user_id=$1
-                   ORDER BY names.recorded_at DESC;
-                """
-        names = await self.bot.db.fetch(query, user.id)
-
-        query = """SELECT *
-                   FROM nicks
-                   WHERE nicks.user_id=$1 AND nicks.guild_id=$2
-                   ORDER BY nicks.recorded_at DESC;
-                """
-        nicks = await self.bot.db.fetch(query, user.id, ctx.guild.id)
-
-        query = """SELECT *
-                   FROM avatars
-                   WHERE avatars.user_id=$1
-                   ORDER BY avatars.recorded_at DESC;
-                """
-        avatars = await self.bot.db.fetch(query, user.id)
-
-        partial = functools.partial(self.draw_image, avatars)
-        image = await self.bot.loop.run_in_executor(None, partial)
-        image.seek(0)
-
-        em = discord.Embed(title=f"{user.display_name} ({user.id})")
-        em.set_image(url="attachment://avatars.png")
-        em.set_thumbnail(url=user.avatar_url)
-
-        em.add_field(name="Names", value=", ".join([name["name"] for name in names]))
-        if nicks:
-            em.add_field(name="Nicks", value=", ".join([nick["nick"] for nick in nicks]))
-        em.add_field(name="Avatar Count", value=len(avatars))
-
-        await ctx.send(embed=em, file=discord.File(image, filename="avatars.png"))
-
     @commands.command(name="pie", description="View a user's presence pie chart")
     async def pie(self, ctx, *, user: discord.Member = None):
         if not user:
