@@ -10,6 +10,7 @@ import calendar
 import io
 import functools
 import os
+import typing
 from PIL import Image, ImageDraw, ImageFont
 
 from .utils.theme import get_theme
@@ -402,9 +403,11 @@ class Tracking(commands.Cog):
         return file
 
     @commands.command(name="avatar", description="View a specific avatar in history")
-    async def avatar(self, ctx, avatar: int, *, user: discord.Member = None):
+    async def avatar(self, ctx, user: typing.Optional[discord.Member] = None, avatar: int = 1):
         if not user:
             user = ctx.author
+        if avatar >= 0:
+            avatar -= 1
 
         query = """SELECT *
                    FROM avatars
@@ -414,9 +417,9 @@ class Tracking(commands.Cog):
         avatars = await self.bot.db.fetch(query, user.id)
 
         try:
-            avatar = avatars[avatar-1]
+            avatar = avatars[avatar]
         except IndexError:
-            return await ctx.send(":x: Invalid avatar index")
+            return await ctx.send(":x: That is not a valid avatar")
 
         em = discord.Embed(timestamp=avatar["recorded_at"])
         em.set_author(name=user.display_name, icon_url=user.avatar_url)
