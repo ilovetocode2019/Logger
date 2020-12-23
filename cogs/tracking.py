@@ -339,19 +339,18 @@ class Tracking(commands.Cog):
         if not user:
             user = ctx.author
 
-        await ctx.trigger_typing()
+        async with ctx.typing():
+            query = """SELECT *
+                       FROM avatars
+                       WHERE avatars.user_id=$1
+                       ORDER BY avatars.recorded_at DESC;
+                    """
+            avatars = await self.bot.db.fetch(query, user.id)
 
-        query = """SELECT *
-                   FROM avatars
-                   WHERE avatars.user_id=$1
-                   ORDER BY avatars.recorded_at DESC;
-                """
-        avatars = await self.bot.db.fetch(query, user.id)
-
-        partial = functools.partial(self.draw_image, avatars)
-        file = await self.bot.loop.run_in_executor(None, partial)
-        file.seek(0)
-        await ctx.send(content=f"Avatars for {user}", file=discord.File(fp=file, filename="image.png"))
+            partial = functools.partial(self.draw_image, avatars)
+            file = await self.bot.loop.run_in_executor(None, partial)
+            file.seek(0)
+            await ctx.send(content=f"Avatars for {user}", file=discord.File(fp=file, filename="image.png"))
 
     def draw_image(self, avatars):
         file = io.BytesIO()
@@ -431,28 +430,27 @@ class Tracking(commands.Cog):
         if not user:
             user = ctx.author
 
-        await ctx.trigger_typing()
+        async with ctx.typing():
+            query = """SELECT *
+                       FROM presences
+                       WHERE presences.user_id=$1
+                       ORDER BY presences.recorded_at ASC;
+                    """
+            presences = await self.bot.db.fetch(query, user.id)
 
-        query = """SELECT *
-                   FROM presences
-                   WHERE presences.user_id=$1
-                   ORDER BY presences.recorded_at ASC;
-                """
-        presences = await self.bot.db.fetch(query, user.id)
+            settings = self.bot.get_cog("Settings")
+            if settings:
+                config = await settings.fetch_config(ctx.author.id)
+                theme = config.theme if config else get_theme(None)
 
-        settings = self.bot.get_cog("Settings")
-        if settings:
-            config = await settings.fetch_config(ctx.author.id)
-            theme = config.theme if config else get_theme(None)
+            else:
+                theme = get_theme(None)
 
-        else:
-            theme = get_theme(None)
-
-        file = io.BytesIO()
-        partial = functools.partial(self.draw_pie, presences, theme)
-        image = await self.bot.loop.run_in_executor(None, partial)
-        image.save(file, "PNG")
-        file.seek(0)
+            file = io.BytesIO()
+            partial = functools.partial(self.draw_pie, presences, theme)
+            image = await self.bot.loop.run_in_executor(None, partial)
+            image.save(file, "PNG")
+            file.seek(0)
 
         await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
 
@@ -502,30 +500,29 @@ class Tracking(commands.Cog):
         if not user:
             user = ctx.author
 
-        await ctx.trigger_typing()
+        async with ctx.typing():
+            query = """SELECT *
+                       FROM presences
+                       WHERE presences.user_id=$1
+                       ORDER BY presences.recorded_at ASC;
+                    """
+            presences = await self.bot.db.fetch(query, user.id)
 
-        query = """SELECT *
-                   FROM presences
-                   WHERE presences.user_id=$1
-                   ORDER BY presences.recorded_at ASC;
-                """
-        presences = await self.bot.db.fetch(query, user.id)
+            settings = self.bot.get_cog("Settings")
+            if settings:
+                config = await settings.fetch_config(ctx.author.id)
+                theme = config.theme if config else get_theme(None)
 
-        settings = self.bot.get_cog("Settings")
-        if settings:
-            config = await settings.fetch_config(ctx.author.id)
-            theme = config.theme if config else get_theme(None)
+            else:
+                theme = get_theme(None)
 
-        else:
-            theme = get_theme(None)
+            file = io.BytesIO()
+            partial = functools.partial(self.draw_chart, presences, theme)
+            image = await self.bot.loop.run_in_executor(None, partial)
+            image.save(file, "PNG")
+            file.seek(0)
 
-        file = io.BytesIO()
-        partial = functools.partial(self.draw_chart, presences, theme)
-        image = await self.bot.loop.run_in_executor(None, partial)
-        image.save(file, "PNG")
-        file.seek(0)
-
-        await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
+            await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
 
     def draw_chart(self, presences, theme):
         image = Image.new("RGB", (3480, 3200), theme.background)
