@@ -351,7 +351,8 @@ class Tracking(commands.Cog):
             partial = functools.partial(self.draw_image, avatars)
             file = await self.bot.loop.run_in_executor(None, partial)
             file.seek(0)
-            await ctx.send(content=f"Avatars for {user}", file=discord.File(fp=file, filename="image.png"))
+
+        await ctx.send(content=f"Avatars for {user}", file=discord.File(fp=file, filename="image.png"))
 
     def draw_image(self, avatars):
         file = io.BytesIO()
@@ -499,7 +500,7 @@ class Tracking(commands.Cog):
         return image
 
     @commands.command(name="chart", description="View a chart of your status over the past month")
-    async def status(self, ctx, *, user: discord.Member = None):
+    async def chart(self, ctx, *, user: discord.Member = None):
         if not user:
             user = ctx.author
 
@@ -525,7 +526,7 @@ class Tracking(commands.Cog):
             image.save(file, "PNG")
             file.seek(0)
 
-            await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
+        await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
 
     def draw_chart(self, presences, theme):
         image = Image.new("RGB", (3480, 3200), theme.background)
