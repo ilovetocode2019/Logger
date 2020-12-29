@@ -47,13 +47,8 @@ class Settings(commands.Cog):
 
         return UserConfig.from_record(record)
 
-    @commands.group(aliases=["config"], invoke_without_command=True)
-    async def settings(self, ctx):
-        """Configure your settings"""
-        await ctx.send_help(ctx.command)
-
-    @settings.command(name="theme")
-    async def settings_theme(self, ctx, *, theme: ThemeConverter = None):
+    @commands.command(name="theme")
+    async def theme(self, ctx, *, theme: ThemeConverter = None):
         """View or change your theme
 
         Available themes:
