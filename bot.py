@@ -25,7 +25,7 @@ log = logging.getLogger("logger")
 
 class Logger(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix=config.prefix, intents=discord.Intents.all(), owner_ids=config.owner_ids)
+        super().__init__(command_prefix=config.prefix, intents=discord.Intents.all())
         self.db_ready = asyncio.Event()
         self.startup_time = datetime.datetime.utcnow()
 
