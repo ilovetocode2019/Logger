@@ -246,7 +246,6 @@ class Admin(commands.Cog):
     @tasks.loop(hours=10)
     async def update_loop(self):
         installed = [
-            "discord.py",
             "jishaku",
             "asyncpg",
             "humanize",
