@@ -404,7 +404,7 @@ class Tracking(commands.Cog):
         return file
 
     @commands.command(name="avatar", description="View a specific avatar in history")
-    async def avatar(self, ctx, user: typing.Optional[discord.Member] = None, avatar: int = 1):
+    async def avatar(self, ctx, user: typing.Optional[discord.Member], avatar: int = 1):
         if not user:
             user = ctx.author
         if avatar >= 0:
