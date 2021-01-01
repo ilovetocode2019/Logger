@@ -124,7 +124,7 @@ class Logger(commands.Bot):
                             {"user_id": user.id, "filename": filename, "hash": user.avatar}
                         )
                     except discord.NotFound:
-                        log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring.")
+                        log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring")
 
                 else:
                     avatar = int(user.discriminator)%5
@@ -149,7 +149,7 @@ class Logger(commands.Bot):
         if avatar_batch:
             await self.db.execute(query, avatar_batch)
             total = len(avatar_batch)
-            log.info("Registered %s to the database.", format(formats.plural(total), "avatar"))
+            log.info("Registered %s to the database", format(formats.plural(total), "avatar"))
         else:
             log.info("No work needed for avatars")
 
@@ -161,7 +161,7 @@ class Logger(commands.Bot):
         if name_batch:
             await self.db.execute(query, name_batch)
             total = len(avatar_batch)
-            log.info("Registered %s to the database.", format(formats.plural(total), "name"))
+            log.info("Registered %s to the database", format(formats.plural(total), "name"))
         else:
             log.info("No work needed for names")
 
@@ -225,7 +225,7 @@ class Logger(commands.Bot):
         if nick_batch:
             await self.db.execute(query, nick_batch)
             total = len(nick_batch)
-            log.info("Registered %s to the database.", format(formats.plural(total), "nick"))
+            log.info("Registered %s to the database", format(formats.plural(total), "nick"))
         else:
             log.info("No work needed for nicks")
 
@@ -237,7 +237,7 @@ class Logger(commands.Bot):
         if presence_batch:
             await self.db.execute(query, presence_batch)
             total = len(presence_batch)
-            log.info("Registered %s to the database.", format(formats.plural(total), "presence"))
+            log.info("Registered %s to the database", format(formats.plural(total), "presence"))
         else:
             log.info("No work needed to presences")
 
