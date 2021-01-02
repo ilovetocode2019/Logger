@@ -177,8 +177,8 @@ class Logger(commands.Bot):
         presences = await self.db.fetch("SELECT * FROM presences;")
 
         log.info("Loading all members and users")
-        users = list(bot.users)
-        members = list(self.get_all_members())
+        users = [discord.User._copy(user) for user in bot.users]
+        members = [discord.Member._copy(member) for member in self.get_all_members()]
 
         log.info("Preparing database")
 

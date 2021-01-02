@@ -98,7 +98,7 @@ class Tracking(commands.Cog):
         presences = await self.bot.db.fetch("SELECT * FROM presences;")
 
         log.info("Loading members")
-        members = list(guild.members)
+        members = [discord.Member._copy(member) for member in guild.members]
 
         nick_batch = []
         presence_batch = []
