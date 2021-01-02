@@ -24,6 +24,7 @@ class Tracking(commands.Cog):
         self._avatar_batch = []
         self._name_batch = []
         self._nick_batch = []
+        self._presence_batch = []
         self._batch_lock = asyncio.Lock(loop=bot.loop)
 
         self.bulk_insert_loop.add_exception_type(asyncpg.PostgresConnectionError)
@@ -32,29 +33,7 @@ class Tracking(commands.Cog):
     def cog_unload(self):
         self.bulk_insert_loop.stop()
 
-    async def get_presence_batch(self):
-        presences = await self.bot.db.fetch("SELECT * FROM presences;")
-
-        presence_batch = []
-        for member in self.bot.get_all_members():
-            member_presences = [
-                presence
-                for presence in presences
-                if presence["user_id"] == member.id
-            ]
-            if (not member_presences or member_presences[-1]["status"] != str(member.status)) and member.id not in [presence["user_id"] for presence in presence_batch]:
-                presence_batch.append(
-                    {
-                        "user_id": member.id,
-                        "status": str(member.status)
-                    }
-                )
-
-        return presence_batch
-
     async def bulk_insert(self):
-        presence_batch = await self.get_presence_batch()
-
         query = """INSERT INTO avatars (user_id, filename, hash)
                    SELECT x.user_id, x.filename, x.hash
                    FROM jsonb_to_recordset($1::jsonb) AS
@@ -93,11 +72,11 @@ class Tracking(commands.Cog):
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, status TEXT)
                 """
-        if presence_batch:
-            await self.bot.db.execute(query, presence_batch)
-            total = len(presence_batch)
+        if self._presence_batch:
+            await self.bot.db.execute(query, self._presence_batch)
+            total = len(self._presence_batch)
             log.info("Registered %s to the database", format(formats.plural(total), "presence"))
-            presence_batch.clear()
+            self._presence_batch.clear()
 
     @tasks.loop(seconds=20.0)
     async def bulk_insert_loop(self):
@@ -280,6 +259,15 @@ class Tracking(commands.Cog):
                     "user_id": after.id,
                     "guild_id": after.guild.id,
                     "nick": after.nick,
+                }
+            )
+
+        presences = [presence for presence in self._presence_batch if presence["user_id"] == after.id]
+        if (not presences or presences[-1]["status"] != str(after.status)) and str(before.status) != str(after.status):
+            self._presence_batch.append(
+                {
+                    "user_id": after.id,
+                    "status": str(after.status)
                 }
             )
 
