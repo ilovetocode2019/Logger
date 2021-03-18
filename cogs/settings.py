@@ -4,7 +4,6 @@ import discord
 from .utils import cache
 from .utils import theme as theme_module
 
-
 class UserConfig:
     @classmethod
     def from_record(cls, record):

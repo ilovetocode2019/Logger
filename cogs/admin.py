@@ -1,206 +1,131 @@
 import discord
-from discord.ext import commands, menus, tasks
+from discord.ext import commands, tasks
 
-import traceback
-import importlib
 import asyncio
-import subprocess
-import sys
+import traceback
+import psutil
+import humanize
+import importlib
 import re
 import os
+import sys
+import subprocess
 import time
 import traceback
 import io
 import pkg_resources
-from jishaku.codeblocks import codeblock_converter
+from jishaku import codeblocks, paginators, shell
 
-from .utils import formats
-
-class Confirm(menus.Menu):
-    def __init__(self, msg):
-        super().__init__(timeout=30.0, delete_message_after=True)
-        self.msg = msg
-        self.result = None
-
-    async def send_initial_message(self, ctx, channel):
-        return await channel.send(self.msg)
-
-    @menus.button("\N{WHITE HEAVY CHECK MARK}")
-    async def do_confirm(self, payload):
-        self.result = True
-        self.stop()
-
-    @menus.button("\N{CROSS MARK}")
-    async def do_deny(self, payload):
-        self.result = False
-        self.stop()
-
-    async def prompt(self, ctx):
-        await self.start(ctx, wait=True)
-        return self.result
-
+from .utils import formats, menus
 
 class Admin(commands.Cog):
-    """Admin commands and features for owners of the bot"""
-
     def __init__(self, bot):
         self.bot = bot
-        self.update_loop.start()
+        self.hidden = True
+
+        self.outdated_packages = []
+        self.update_packages_loop.start()
 
     def cog_unload(self):
-        self.update_loop.cancel()
+        self.update_packages_loop.cancel()
 
     async def cog_check(self, ctx):
-        return await commands.is_owner().predicate(ctx)
+        return await self.bot.is_owner(ctx.author)
 
-    @commands.group(
-        name="reload",
-        aliases=["load"],
-        invoke_without_command=True,
-    )
-    async def _reload(self, ctx, *, cog="all"):
-        """Reload an extension"""
-
-        if cog == "all":
-            msg = ""
-
-            for ext in self.bot.cogs_to_add:
-                try:
-                    self.bot.reload_extension(ext)
-                    msg += (
-                        f"**\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS} Reloaded** `{ext}`\n\n"
-                    )
-
-                except Exception as e:
-                    traceback_data = "".join(
-                        traceback.format_exception(type(e), e, e.__traceback__, 1)
-                    )
-                    msg += (
-                        f"**\N{CROSS MARK} Extension `{ext}` not loaded.**\n"
-                        f"```py\n{traceback_data}```\n\n"
-                    )
-                    traceback.print_exception(type(e), e, e.__traceback__)
-            return await ctx.send(msg)
-
+    @commands.command(name="reload", description="Reload an extension")
+    async def reload(self, ctx, extension):
         try:
-            self.bot.reload_extension(cog.lower())
-            await ctx.send(f"\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS} **Reloaded** `{cog.lower()}`")
-        except Exception as e:
-            traceback_data = "".join(
-                traceback.format_exception(type(e), e, e.__traceback__, 1)
-            )
-            await ctx.send(
-                f"**\N{CROSS MARK} Extension `{cog.lower()}` not loaded.**\n```py\n{traceback_data}```"
-            )
-            traceback.print_exception(type(e), e, e.__traceback__)
+            self.bot.reload_extension(extension)
+            await ctx.send(f":repeat: Reloaded `{extension}`")
+        except commands.ExtensionError as exc:
+            full = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__, 1))
+            await ctx.send(f":warning: Couldn't reload `{extension}`\n```py\n{full}```")
 
-    # https://github.com/Rapptz/RoboDanny/blob/6211293d8fe19ad46a266ded2464752935a3fb94/cogs/admin.py#L89-L97
-    async def run_process(self, command):
+    @commands.command(name="load", description="Load an extension")
+    async def load(self, ctx, extension):
         try:
-            process = await asyncio.create_subprocess_shell(
-                command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            result = await process.communicate()
-        except NotImplementedError:
-            process = subprocess.Popen(
-                command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            result = await self.bot.loop.run_in_executor(None, process.communicate)
+            self.bot.load_extension(extension)
+            await ctx.send(f":inbox_tray: Loaded `{extension}`")
+        except commands.ExtensionError as exc:
+            full = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__, 1))
+            await ctx.send(f":warning: Couldn't load `{extension}`\n```py\n{full}```")
 
-        return [output.decode() for output in result]
-
-    # https://github.com/Rapptz/RoboDanny/blob/6211293d8fe19ad46a266ded2464752935a3fb94/cogs/admin.py#L146-L214
-    _GIT_PULL_REGEX = re.compile(r"\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+")
-
-    def find_modules_from_git(self, output):
-        files = self._GIT_PULL_REGEX.findall(output)
-        ret = []
-        for file in files:
-            root, ext = os.path.splitext(file)
-            if ext != ".py":
-                continue
-
-            if root.startswith("cogs/"):
-                # A submodule is a directory inside the main cog directory for
-                # my purposes
-                ret.append((root.count("/") - 1, root.replace("/", ".")))
-
-        # For reload order, the submodules should be reloaded first
-        ret.sort(reverse=True)
-        return ret
-
-    def reload_or_load_extension(self, module):
+    @commands.command(name="unload", description="Unload an extension")
+    async def unload(self, ctx, extension):
         try:
-            self.bot.reload_extension(module)
-        except commands.ExtensionNotLoaded:
-            self.bot.load_extension(module)
+            self.bot.unload_extension(extension)
+            await ctx.send(f":outbox_tray: Unloaded `{extension}`")
+        except commands.ExtensionError as exc:
+            full = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__, 1))
+            await ctx.send(f":warning: Couldn't unload `{extension}`\n```py\n{full}```")
 
-    @_reload.command(name="all")
-    async def _reload_all(self, ctx):
-        """Reloads all modules, while pulling from git."""
-
+    @commands.command(name="update", description="Update the bot")
+    async def update(self, ctx):
         async with ctx.typing():
-            stdout, stderr = await self.run_process("git pull")
+            # Run git pull to update bot
+            process = await asyncio.create_subprocess_shell("git pull", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = await process.communicate()
+            text = stdout.decode()
 
-        # progress and stuff is redirected to stderr in git pull
-        # however, things like "fast forward" and files
-        # along with the text "already up-to-date" are in stdout
+            # Find modules that need reloading
+            modules = []
+            regex = re.compile(r"\s*(?P<filename>.+?)\s*\|\s*[0-9]+\s*[+-]+")
+            files = regex.findall(text)
 
-        if stdout.startswith("Already up-to-date."):
-            return await ctx.send(stdout)
+            for file in files:
+                root, module = os.path.splitext(file)
+                if module != ".py":
+                    continue
+                if root.startswith("cogs/") and root.count("/") == 1:
+                    modules.append((root.count("/")-1, root.replace("/", ".")))
 
-        modules = self.find_modules_from_git(stdout)
+            modules.sort(reverse=True)
 
         if not modules:
-            return await ctx.send("No modules need to be updated.")
+            return await ctx.send("Nothing to update")
 
-        mods_text = "\n".join(
-            f"{index}. `{module}`" for index, (_, module) in enumerate(modules, start=1)
-        )
-        prompt_text = (
-            f"This will update the following modules, are you sure?\n{mods_text}"
-        )
+        joined = "\n".join([module for is_module, module in modules])
+        result = await menus.Confirm(f"Are you sure you want to update the followings modules?\n{joined}").prompt(ctx)
+        if not result:
+            return await ctx.send("Aborting")
 
-        confirm = await Confirm(prompt_text).prompt(ctx)
-        if not confirm:
-            return await ctx.send("Aborting.")
-
-        statuses = []
-        for is_submodule, module in modules:
-            if is_submodule:
+        # Reload all the modules
+        results = []
+        for is_module, module in modules:
+            if is_module:
                 try:
-                    actual_module = sys.modules[module]
-                except KeyError:
-                    statuses.append(("\N{WHITE HEAVY CHECK MARK}", module))
-                else:
+                    lib = sys.modules[module]
                     try:
-                        importlib.reload(actual_module)
-                    except Exception as e:
-                        traceback_data = "".join(
-                            traceback.format_exception(type(e), e, e.__traceback__, 1)
-                        )
-                        statuses.append(
-                            ("\N{CROSS MARK}", f"{module}\n```py\n{traceback_data}\n```")
-                        )
-                    else:
-                        statuses.append(("\N{WHITE HEAVY CHECK MARK}", module))
+                        importlib.reload(lib)
+                        results.append((True, module))
+                    except:
+                        results.append((False, module))
+                except KeyError:
+                    results.append((None, module))
+
             else:
                 try:
-                    self.reload_or_load_extension(module)
-                except commands.ExtensionError as e:
-                    traceback_data = "".join(
-                        traceback.format_exception(type(e), e, e.__traceback__, 1)
-                    )
-                    statuses.append(
-                        ("\N{CROSS MARK}", f"{module}\n```py\n{traceback_data}\n```")
-                    )
-                else:
-                    statuses.append(("\N{WHITE HEAVY CHECK MARK}", module))
+                    try:
+                        self.bot.reload_extension(module)
+                    except commands.ExtensionNotLoaded:
+                        self.bot.load_extension(module)
+                    results.append((True, module))
+                except:
+                    results.append((False, module))
 
-        await ctx.send("\n".join(f"{status} `{module}`" for status, module in statuses))
+        message = ""
+        for status, module in results:
+            if status == True:
+                message += f"\n:white_check_mark: {module}"
+            elif status == False:
+                message += f"\n:x: {module}"
+            else:
+                message += f"\n:zzz: {module}"
+
+        await ctx.send(message)
 
     @commands.command(name="sql", description="Run some sql")
-    async def sql(self, ctx, *, code: codeblock_converter):
+    async def sql(self, ctx, *, code: codeblocks.codeblock_converter):
         _, query = code
 
         execute = query.count(";") > 1
@@ -237,19 +162,36 @@ class Admin(commands.Cog):
         except discord.HTTPException:
             await ctx.send(file=discord.File(io.BytesIO(str(results).encode("utf-8")), filename="result.txt"))
 
-    @commands.command(name="logout", description="Logs out and shuts down bot")
+    @commands.command(name="process", description="View system stats", aliases=["system", "health"])
+    async def process(self, ctx):
+        em = discord.Embed(title="Process", color=0x96c8da)
+        em.add_field(name="CPU", value=f"{psutil.cpu_percent()}% used with {formats.plural(psutil.cpu_count()):CPU}")
+
+        mem = psutil.virtual_memory()
+        em.add_field(name="Memory", value=f"{humanize.naturalsize(mem.used)}/{humanize.naturalsize(mem.total)} ({mem.percent}% used)")
+
+        disk = psutil.disk_usage("/")
+        em.add_field(name="Disk", value=f"{humanize.naturalsize(disk.used)}/{humanize.naturalsize(disk.total)} ({disk.percent}% used)")
+
+        await ctx.send(embed=em)
+
+    @commands.command(name="logout", description="Logout the bot")
+    @commands.is_owner()
     async def logout(self, ctx):
-        self.bot.log.info("Logging out of Discord")
-        await ctx.send("Logging out :wave:")
+        await ctx.send(":wave: Logging out")
         await self.bot.logout()
 
-    @tasks.loop(hours=10)
-    async def update_loop(self):
+    async def get_outdated_packages(self, wait=None):
         installed = [
             "jishaku",
             "asyncpg",
+            "youtube_dl",
+            "Pillow",
+            "parsedatetime",
             "humanize",
-            "Pillow"
+            "python-dateutil",
+            "psutil",
+            "lxml"
         ]
 
         outdated = []
@@ -263,20 +205,31 @@ class Admin(commands.Cog):
                 if current_version != pypi_version:
                     outdated.append((package, current_version, pypi_version))
             except Exception as exc:
-                traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+                traceback.print_exception(type(exc), exc, exc.__traceback__,file=sys.stderr)
 
-            await asyncio.sleep(5)
+            if wait:
+                await asyncio.sleep(wait)
+
+        return outdated
+
+    @tasks.loop(hours=10)
+    async def update_packages_loop(self):
+        """Checks for outdated packages every 10 hours."""
+
+        outdated = await self.get_outdated_packages(wait=5)
+        self.outdated_packages = outdated
 
         if outdated:
             joined = " ".join([package[0] for package in outdated])
-            em = discord.Embed(title="Outdated Packages", description=f"Update with `jsk sh venv/bin/pip install -U {joined}`\n", color=discord.Color.blurple())
+            em = discord.Embed(title="Outdated Packages", description=f"Update with `jsk sh {sys.executable} -m pip install -U {joined}`\n", color=0x96c8da)
+
             for package in outdated:
                 em.description += f"\n{package[0]} (Current: {package[1]} | Latest: {package[2]})"
 
             await self.bot.console.send(embed=em)
 
-    @update_loop.before_loop
-    async def before_update_loop(self):
+    @update_packages_loop.before_loop
+    async def before_update_packages_loop(self):
         await self.bot.wait_until_ready()
 
 def setup(bot):

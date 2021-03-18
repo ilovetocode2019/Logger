@@ -1,10 +1,10 @@
 import discord
 from discord.ext import commands
 
-import sys
-import traceback
 import datetime
 import humanize
+import sys
+import traceback
 
 class HelpCommand(commands.MinimalHelpCommand):
     def get_command_signature(self, command):

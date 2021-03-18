@@ -2,14 +2,15 @@ import discord
 from discord.ext import commands, tasks
 
 import asyncio
-import logging
 import asyncpg
-import humanize
-import datetime
 import calendar
-import io
+import datetime
 import functools
+import logging
+import humanize
+import io
 import os
+import time
 import typing
 from PIL import Image, ImageDraw, ImageFont
 
@@ -473,7 +474,6 @@ class Tracking(commands.Cog):
         drawing.pieslice(shape, start=round(online*360, 2), end=round((online+idle)*360, 2), fill="yellow")
         drawing.pieslice(shape, start=round((online+idle)*360, 2), end=round((online+idle+dnd)*360, 2), fill="red")
         drawing.pieslice(shape, start=round((online+idle+dnd)*360, 2), end=round(360, 2), fill="gray")
-
 
         text = f"Online - {round(online*100, 2) or 0}% \nIdle - {round(idle*100, 2) or 0}% \nDo Not Disturb - {round(dnd*100, 2) or 0}% \nOffline - {round(offline*100, 2) or 0}%"
         font = ImageFont.truetype("arial", 120)
