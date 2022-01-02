@@ -19,6 +19,83 @@ from .utils import formats
 
 log = logging.getLogger("logger.tracking")
 
+class MonthConverter(commands.Converter):
+    async def convert(self, ctx, arg):
+        months_mapping = {
+            "Jan": 1,
+            "January": 1,
+            "Feb": 2,
+            "Februrary": 3,
+            "Mar": 3,
+            "March": 3,
+            "Apr": 4,
+            "April": 4,
+            "May": 5,
+            "Jun": 6,
+            "June": 6,
+            "Jul": 7,
+            "July": 7,
+            "Aug": 8,
+            "August": 8,
+            "Sep": 9,
+            "September": 9,
+            "Oct": 10,
+            "October": 10,
+            "Nov": 11,
+            "November": 11,
+            "Dec": 12,
+            "December": 12
+        }
+
+        if arg.isdigit():
+            arg = int(arg)
+
+            if arg > 0 and arg < 12:
+                month = arg
+            else:
+                raise commands.BadArgument(f"Month {arg} is out of range")
+        elif arg in months_mapping:
+            month = months_mapping[arg]
+        else:
+            raise commands.BadArgument(f"Month {arg} not recognized")
+
+        return month
+
+class YearConverter(commands.Converter):
+    async def convert(self, ctx, arg):
+        if arg.isdigit():
+            if len(arg) > 4:
+                raise commands.BadArgument(f"Year {arg} is too long")
+
+            arg = int(arg)
+            year = arg
+        else:
+            raise commands.BadArgument(f"Year {arg} not recognized")
+
+        return year
+
+class TimeConverter(commands.Converter):
+    async def convert(self, ctx, arg):
+        """months_mapping = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+
+        if arg in months_mapping:
+            month = months_mapping[arg]
+            time = datetime.datetime.utcnow().replace(month=month, day=1)-datetime.timedelta(days=1)
+        else:
+            try:
+                time = dateutil.parser.parse(arg)-datetime.timedelta(days=1)
+            except:
+                raise commands.BadArgument("This is not a time")
+
+        return time
+        """
+
+        try:
+            return dateutil.parser.parse(arg)-datetime.timedelta(days=1)
+        except:
+            raise commands.BadArgument("This is not a time")
+
+
 class Tracking(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -336,13 +413,13 @@ class Tracking(commands.Cog):
                     """
             avatars = await self.bot.db.fetch(query, user.id)
 
-            partial = functools.partial(self.draw_image, avatars)
+            partial = functools.partial(self.draw_avatars, avatars)
             file = await self.bot.loop.run_in_executor(None, partial)
             file.seek(0)
 
         await ctx.send(content=f"Avatars for {user}", file=discord.File(fp=file, filename="image.png"))
 
-    def draw_image(self, avatars):
+    def draw_avatars(self, avatars):
         file = io.BytesIO()
 
         if len(avatars) != 1:
@@ -513,18 +590,60 @@ class Tracking(commands.Cog):
             image.save(file, "PNG")
             file.seek(0)
 
-        await ctx.send(content=f"Status chart for {user}", file=discord.File(file, filename="chart.png"))
+        await ctx.send(content=f"Status chart for {user} during the past 30 days", file=discord.File(file, filename="chart.png"))
 
-    def draw_chart(self, presences, theme):
+    @commands.command(name="chartfor", description="View a chart of your status for a specified time period")
+    async def chart_for(self, ctx, month: typing.Optional[MonthConverter] = None, year: typing.Optional[YearConverter] = None, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        if not month and not year:
+            raise commands.BadArgument("Neither year nor month provided")
+
+        now = datetime.datetime.utcnow()
+        year = year or now.year
+        month = month or now.month
+
+        time = now.replace(year=year, month=month, day=1)-datetime.timedelta(days=1)
+
+        async with ctx.typing():
+            query = """SELECT *
+                       FROM presences
+                       WHERE presences.user_id=$1
+                       ORDER BY presences.recorded_at ASC;
+                    """
+            presences = await self.bot.db.fetch(query, user.id)
+
+            settings = self.bot.get_cog("Settings")
+            if settings:
+                config = await settings.fetch_config(ctx.author.id)
+                theme = config.theme if config else get_theme(None)
+
+            else:
+                theme = get_theme(None)
+
+            file = io.BytesIO()
+            partial = functools.partial(self.draw_chart, presences, theme, time)
+            image = await self.bot.loop.run_in_executor(None, partial)
+            image.save(file, "PNG")
+            file.seek(0)
+
+        await ctx.send(content=f"Status chart for {user} in {(time+datetime.timedelta(days=1)).year}", file=discord.File(file, filename="chart.png"))
+
+    def draw_chart(self, presences, theme, time=None):
         image = Image.new("RGB", (3480, 3200), theme.background)
         drawing = ImageDraw.Draw(image, "RGBA")
         font = ImageFont.truetype("arial", 100)
 
-        time = datetime.datetime.utcnow()-datetime.timedelta(days=30)
+        if not time:
+            time = datetime.datetime.utcnow()-datetime.timedelta(days=30)
 
         days = calendar.monthrange(time.year, time.month)[1]
         if days <= time.day:
-            time = time.replace(month=time.month+1, day=(time.day - int(days))+1)
+            if time.month == 12:
+                time = time.replace(year=time.year+1, month=1, day=(time.day - int(days))+1)
+            else:
+                time = time.replace(month=time.month+1, day=(time.day - int(days))+1)
         else:
             time = time.replace(day=time.day+1)
 
@@ -532,6 +651,7 @@ class Tracking(commands.Cog):
         keys = {"online": "green", "idle": "yellow", "dnd": "red", "offline": "gray"}
         months = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
+        end_color = keys[presences[-1]["status"]]
         for row in range(2, 32):
             for pixel in range(600, 3481):
                 last = None
@@ -545,10 +665,12 @@ class Tracking(commands.Cog):
                             color = None
                         found = True
                         break
+
                     last = presence
+                    del presences[:presences.index(last)]
 
                 if not found and time < datetime.datetime.utcnow():
-                    color = keys[presences[-1]["status"]]
+                    color = end_color
 
                 if color:
                     drawing.rectangle([(pixel, row*100), (pixel+1, (row*100)+99)], fill=color)

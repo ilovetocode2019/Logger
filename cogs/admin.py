@@ -183,15 +183,11 @@ class Admin(commands.Cog):
 
     async def get_outdated_packages(self, wait=None):
         installed = [
-            "jishaku",
             "asyncpg",
-            "youtube_dl",
-            "Pillow",
-            "parsedatetime",
             "humanize",
-            "python-dateutil",
+            "jishaku",
+            "Pillow",
             "psutil",
-            "lxml"
         ]
 
         outdated = []
