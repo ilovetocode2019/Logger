@@ -12,7 +12,7 @@ import io
 import os
 import time
 import typing
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from .utils.theme import get_theme
 from .utils import formats
@@ -523,7 +523,40 @@ class Tracking(commands.Cog):
 
         await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
 
-    def draw_pie(self, presences, theme):
+    @commands.command(name="ring", description="View a user's presence ring", aliases=["avatarpie"])
+    async def ring(self, ctx, *, user: discord.Member = None):
+        if not user:
+            user = ctx.author
+
+        async with ctx.typing():
+            query = """SELECT *
+                       FROM presences
+                       WHERE presences.user_id=$1
+                       ORDER BY presences.recorded_at ASC;
+                    """
+            presences = await self.bot.db.fetch(query, user.id)
+
+            settings = self.bot.get_cog("Settings")
+            if settings:
+                config = await settings.fetch_config(ctx.author.id)
+                theme = config.theme if config else get_theme(None)
+
+            else:
+                theme = get_theme(None)
+
+            async with self.bot.session.get(str(user.avatar_url_as(format="png"))) as resp:
+                avatar = io.BytesIO(await resp.read())
+                avatar = Image.open(avatar)
+
+            file = io.BytesIO()
+            partial = functools.partial(self.draw_pie, presences, theme, avatar)
+            image = await self.bot.loop.run_in_executor(None, partial)
+            image.save(file, "PNG")
+            file.seek(0)
+
+        await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
+
+    def draw_pie(self, presences, theme, avatar=None):
         presence_times = {"online": 0, "idle": 0, "dnd": 0, "offline": 0}
         for counter, presence in enumerate(presences):
             if presence["status"]:
@@ -560,6 +593,21 @@ class Tracking(commands.Cog):
         drawing.rectangle([(10, 130), (110, 240)], fill="yellow")
         drawing.rectangle([(10, 250), (110, 360)], fill="red")
         drawing.rectangle([(10, 370), (110, 480)], fill="gray")
+
+        if avatar:
+            avatar_size = 1000
+            shape_center = shape[0][0]+((shape[1][0]-shape[0][0])/2)
+            avatar_center = avatar_size/2
+            avatar_start = int(shape_center-avatar_center)
+
+            mask = Image.new("L", (avatar_size, avatar_size), 0)
+            draw = ImageDraw.Draw(mask)
+            draw.ellipse((0, 0) + (avatar_size, avatar_size), fill=255)
+
+            rounded_avatar = ImageOps.fit(avatar, mask.size, centering=(0.5, 0.5))
+            rounded_avatar.putalpha(mask)
+
+            image.paste(rounded_avatar, (avatar_start, avatar_start), rounded_avatar)
 
         return image
 
