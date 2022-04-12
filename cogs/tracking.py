@@ -369,13 +369,16 @@ class Tracking(commands.Cog):
                 """
         names = await self.bot.db.fetch(query, user.id)
 
-        content = ""
+        paginator = commands.Paginator(prefix=None, suffix=None)
+
         for name in names:
             recorded_at = name["recorded_at"]
             timedelta = datetime.datetime.utcnow() - recorded_at
-            content += f"\n{name['name']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+            line = f"\n{name['name']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+            paginator.add_line(discord.utils.escape_markdown(line))
 
-        await ctx.send(discord.utils.escape_markdown(content))
+        for page in paginator.pages:
+            await ctx.send(page)
 
     @commands.command(name="nicks", description="View past nicknames for a user")
     async def nicks(self, ctx, *, user: discord.Member = None):
@@ -392,13 +395,16 @@ class Tracking(commands.Cog):
         if not nicks:
             return await ctx.send(":x: User has no recorded nicknames for this server")
 
-        content = ""
+        paginator = commands.Paginator(prefix=None, suffix=None)
+
         for nick in nicks:
             recorded_at = nick["recorded_at"]
             timedelta = datetime.datetime.utcnow() - recorded_at
-            content += f"\n{nick['nick']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+            line = f"\n{nick['nick']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+            paginator.add_line(discord.utils.escape_markdown(line))
 
-        await ctx.send(discord.utils.escape_markdown(content))
+        for page in paginator.pages:
+            await ctx.send(page)
 
     @commands.command(name="avatars", descripion="Avatars")
     async def avatars(self, ctx, *, user: discord.Member = None):
