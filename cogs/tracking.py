@@ -374,7 +374,7 @@ class Tracking(commands.Cog):
         for name in names:
             recorded_at = name["recorded_at"]
             timedelta = datetime.datetime.utcnow() - recorded_at
-            line = f"\n{name['name']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+            line = f"{name['name']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
             paginator.add_line(discord.utils.escape_markdown(line))
 
         for page in paginator.pages:
@@ -400,7 +400,7 @@ class Tracking(commands.Cog):
         for nick in nicks:
             recorded_at = nick["recorded_at"]
             timedelta = datetime.datetime.utcnow() - recorded_at
-            line = f"\n{nick['nick']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
+            line = f"{nick['nick']} - {humanize.naturaldate(recorded_at)} ({humanize.naturaldelta(timedelta)} ago)"
             paginator.add_line(discord.utils.escape_markdown(line))
 
         for page in paginator.pages:
