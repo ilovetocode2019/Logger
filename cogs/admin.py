@@ -1,25 +1,32 @@
-import discord
-from discord.ext import commands, tasks
+from __future__ import annotations
 
 import asyncio
-import traceback
-import psutil
-import humanize
 import importlib
-import re
+import io
 import os
-import sys
+import re
 import subprocess
+import sys
 import time
 import traceback
-import io
+from typing import TYPE_CHECKING
+
+import discord
+import humanize
 import pkg_resources
+import psutil
+from discord.ext import commands, tasks
 from jishaku import codeblocks, paginators, shell
 
 from .utils import formats, menus
+from .utils.context import Context
+
+if TYPE_CHECKING:
+    from bot import Logger
+
 
 class Admin(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: Logger):
         self.bot = bot
         self.hidden = True
 
@@ -33,34 +40,34 @@ class Admin(commands.Cog):
         return await self.bot.is_owner(ctx.author)
 
     @commands.command(name="reload", description="Reload an extension")
-    async def reload(self, ctx, extension):
+    async def reload(self, ctx: Context, extension: str):
         try:
-            self.bot.reload_extension(extension)
+            await self.bot.reload_extension(extension)
             await ctx.send(f":repeat: Reloaded `{extension}`")
         except commands.ExtensionError as exc:
             full = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__, 1))
             await ctx.send(f":warning: Couldn't reload `{extension}`\n```py\n{full}```")
 
     @commands.command(name="load", description="Load an extension")
-    async def load(self, ctx, extension):
+    async def load(self, ctx: Context, extension: str):
         try:
-            self.bot.load_extension(extension)
+            await self.bot.load_extension(extension)
             await ctx.send(f":inbox_tray: Loaded `{extension}`")
         except commands.ExtensionError as exc:
             full = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__, 1))
             await ctx.send(f":warning: Couldn't load `{extension}`\n```py\n{full}```")
 
     @commands.command(name="unload", description="Unload an extension")
-    async def unload(self, ctx, extension):
+    async def unload(self, ctx: Context, extension: str):
         try:
-            self.bot.unload_extension(extension)
+            await self.bot.unload_extension(extension)
             await ctx.send(f":outbox_tray: Unloaded `{extension}`")
         except commands.ExtensionError as exc:
             full = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__, 1))
             await ctx.send(f":warning: Couldn't unload `{extension}`\n```py\n{full}```")
 
     @commands.command(name="update", description="Update the bot")
-    async def update(self, ctx):
+    async def update(self, ctx: Context):
         async with ctx.typing():
             # Run git pull to update bot
             process = await asyncio.create_subprocess_shell("git pull", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -106,9 +113,9 @@ class Admin(commands.Cog):
             else:
                 try:
                     try:
-                        self.bot.reload_extension(module)
+                        await elf.bot.reload_extension(module)
                     except commands.ExtensionNotLoaded:
-                        self.bot.load_extension(module)
+                        await self.bot.load_extension(module)
                     results.append((True, module))
                 except:
                     results.append((False, module))
@@ -125,7 +132,7 @@ class Admin(commands.Cog):
         await ctx.send(message)
 
     @commands.command(name="sql", description="Run some sql")
-    async def sql(self, ctx, *, code: codeblocks.codeblock_converter):
+    async def sql(self, ctx: Context, *, code: codeblocks.codeblock_converter):
         _, query = code
 
         execute = query.count(";") > 1
@@ -163,7 +170,7 @@ class Admin(commands.Cog):
             await ctx.send(file=discord.File(io.BytesIO(str(results).encode("utf-8")), filename="result.txt"))
 
     @commands.command(name="process", description="View system stats", aliases=["system", "health"])
-    async def process(self, ctx):
+    async def process(self, ctx: Context):
         em = discord.Embed(title="Process", color=0x96c8da)
         em.add_field(name="CPU", value=f"{psutil.cpu_percent()}% used with {formats.plural(psutil.cpu_count()):CPU}")
 
@@ -177,9 +184,9 @@ class Admin(commands.Cog):
 
     @commands.command(name="logout", description="Logout the bot")
     @commands.is_owner()
-    async def logout(self, ctx):
+    async def logout(self, ctx: Context):
         await ctx.send(":wave: Logging out")
-        await self.bot.logout()
+        await self.bot.close()
 
     async def get_outdated_packages(self, wait=None):
         installed = [
@@ -228,5 +235,5 @@ class Admin(commands.Cog):
     async def before_update_packages_loop(self):
         await self.bot.wait_until_ready()
 
-def setup(bot):
-    bot.add_cog(Admin(bot))
+async def setup(bot: Logger) -> None:
+    await bot.add_cog(Admin(bot))
