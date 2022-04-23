@@ -1,21 +1,26 @@
-import discord
-from discord.ext import commands, tasks
+from __future__ import annotations
 
 import asyncio
-import asyncpg
 import calendar
 import datetime
 import functools
-import logging
-import humanize
 import io
-import os
-import time
+import logging
 import typing
+
+import asyncpg
+import discord
+import humanize
+from discord import app_commands
+from discord.ext import commands, tasks
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from .utils.theme import get_theme
 from .utils import formats
+from .utils.context import Context
+from .utils.theme import get_theme
+
+if typing.TYPE_CHECKING:
+    from bot import Logger
 
 log = logging.getLogger("logger.tracking")
 
@@ -74,30 +79,9 @@ class YearConverter(commands.Converter):
 
         return year
 
-class TimeConverter(commands.Converter):
-    async def convert(self, ctx, arg):
-        """months_mapping = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
-
-        if arg in months_mapping:
-            month = months_mapping[arg]
-            time = datetime.datetime.utcnow().replace(month=month, day=1)-datetime.timedelta(days=1)
-        else:
-            try:
-                time = dateutil.parser.parse(arg)-datetime.timedelta(days=1)
-            except:
-                raise commands.BadArgument("This is not a time")
-
-        return time
-        """
-
-        try:
-            return dateutil.parser.parse(arg)-datetime.timedelta(days=1)
-        except:
-            raise commands.BadArgument("This is not a time")
-
 
 class Tracking(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: Logger):
         self.bot = bot
         self._avatar_batch = []
         self._name_batch = []
@@ -105,10 +89,11 @@ class Tracking(commands.Cog):
         self._presence_batch = []
         self._batch_lock = asyncio.Lock(loop=bot.loop)
 
+    async def cog_load(self):
         self.bulk_insert_loop.add_exception_type(asyncpg.PostgresConnectionError)
         self.bulk_insert_loop.start()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.bulk_insert_loop.stop()
 
     async def bulk_insert(self):
@@ -168,7 +153,7 @@ class Tracking(commands.Cog):
         log.info("Starting bulk insert loop")
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild):
+    async def on_guild_join(self, guild: discord.Guild):
         log.info("Joined a new guild")
 
         log.info("Loading database")
@@ -240,7 +225,7 @@ class Tracking(commands.Cog):
         await self.bot.update_users(members)
 
     @commands.Cog.listener()
-    async def on_member_join(self, user):
+    async def on_member_join(self, user: discord.Member):
         log.info("Member joined a guild")
 
         log.info("Loading database")
@@ -265,16 +250,17 @@ class Tracking(commands.Cog):
 
         log.info("Updating database")
 
-        if not user_avatars or user_avatars[-1]["hash"] != user.avatar:
+        avatar_key = user.avatar.key if user.avatar else None
+        if not user_avatars or user_avatars[-1]["hash"] != avatar_key:
             if user.avatar:
                 try:
-                    filename = f"{user.id}-{user.avatar}.png"
-                    await user.avatar_url_as(format="png").save(f"images/{filename}")
+                    filename = f"{user.id}-{user.avatar.key}.png"
+                    await user.avatar.with_format("png").save(f"images/{filename}")
 
                     query = """INSERT INTO avatars (user_id, filename, hash)
                                 VALUES ($1, $2, $3);
                             """
-                    await self.bot.db.execute(query, user.id, filename, user.avatar)
+                    await self.bot.db.execute(query, user.id, filename, user.avatar.key)
                 except discord.NotFound:
                     log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring")
 
@@ -304,17 +290,19 @@ class Tracking(commands.Cog):
             await self.bot.db.execute(query, user.id, str(user.status))
 
     @commands.Cog.listener()
-    async def on_user_update(self, before, after):
+    async def on_user_update(self, before: discord.User, after: discord.User):
         if before.name != after.name:
             self._name_batch.append({"user_id": after.id, "name": after.name})
 
-        if before.avatar != after.avatar:
+        before_avatar_key = before.avatar.key if before.avatar else None
+        after_avatar_key = after.avatar.key if after.avatar else None
+        if before_avatar_key != after_avatar_key:
             if after.avatar:
-                filename = f"{after.id}-{after.avatar}.png"
-                await after.avatar_url_as(format="png").save(f"images/{filename}")
+                filename = f"{after.id}-{after.avatar.key}.png"
+                await after.display_avatar.with_format("png").save(f"images/{filename}")
 
                 self._avatar_batch.append(
-                    {"user_id": after.id, "filename": filename, "hash": after.avatar}
+                    {"user_id": after.id, "filename": filename, "hash": after.avatar.key}
                 )
             else:
                 avatar = int(after.discriminator) % 5
@@ -330,7 +318,7 @@ class Tracking(commands.Cog):
                 )
 
     @commands.Cog.listener()
-    async def on_member_update(self, before, after):
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
         if after.nick and before.nick != after.nick:
             self._nick_batch.append(
                 {
@@ -350,17 +338,18 @@ class Tracking(commands.Cog):
             )
 
     @commands.Cog.listener()
-    async def on_member_leave(self, user):
+    async def on_member_remove(self, user: discord.Member):
         if not [guild for guild in self.bot.guilds if user.id in [member.id for member in guild.members]]:
             query = """INSERT INTO presences (user_id, status)
                        VALUES ($1, $2);
                     """
             await self.bot.db.execute(query, user.id, None)
 
-    @commands.command(name="names", description="View past usernames for a user")
-    async def names(self, ctx, *, user: discord.Member = None):
+    @commands.hybrid_command(name="names", description="View past usernames for a user")
+    @app_commands.describe(user="Who's username history to show")
+    async def names(self, ctx: Context, *, user: discord.Member = None):  # type: ignore
         if not user:
-            user = ctx.author
+            user = ctx.author  # type: ignore
 
         query = """SELECT *
                    FROM names
@@ -380,10 +369,11 @@ class Tracking(commands.Cog):
         for page in paginator.pages:
             await ctx.send(page)
 
-    @commands.command(name="nicks", description="View past nicknames for a user")
-    async def nicks(self, ctx, *, user: discord.Member = None):
+    @commands.hybrid_command(name="nicks", description="View past nicknames for a user")
+    @app_commands.describe(user="Who's nickname history to show")
+    async def nicks(self, ctx: Context, *, user: discord.Member = None):  # type: ignore
         if not user:
-            user = ctx.author
+            user = ctx.author  # type: ignore
 
         query = """SELECT *
                    FROM nicks
@@ -406,12 +396,17 @@ class Tracking(commands.Cog):
         for page in paginator.pages:
             await ctx.send(page)
 
-    @commands.command(name="avatars", descripion="Avatars")
-    async def avatars(self, ctx, *, user: discord.Member = None):
-        if not user:
-            user = ctx.author
+    @commands.hybrid_command(name="avatars")
+    @app_commands.describe(user="Who's avatar history to show")
+    async def avatars(self, ctx: Context, *, user: discord.Member = None):  # type: ignore
+        """View past avatars for a user"""
 
-        async with ctx.typing():
+        if not user:
+            user = ctx.author  # type: ignore
+
+        await ctx.defer()
+
+        async with ctx.maybe_typing():
             query = """SELECT *
                        FROM avatars
                        WHERE avatars.user_id=$1
@@ -474,8 +469,9 @@ class Tracking(commands.Cog):
 
         return file
 
-    @commands.command(name="avatar", description="View a specific avatar in history")
-    async def avatar(self, ctx, user: typing.Optional[discord.Member], avatar: int = 1):
+    @commands.hybrid_command(name="avatar", description="View a specific avatar in history")
+    @app_commands.describe(user="Who's avatar to show", avatar="The index of the avatar in history")
+    async def avatar(self, ctx: Context, user: typing.Optional[discord.Member], avatar: int = 1):
         if not user:
             user = ctx.author
         if avatar >= 0:
@@ -494,18 +490,21 @@ class Tracking(commands.Cog):
             return await ctx.send(":x: That is not a valid avatar")
 
         em = discord.Embed(timestamp=avatar["recorded_at"])
-        em.set_author(name=user.display_name, icon_url=user.avatar_url)
+        em.set_author(name=user.display_name, icon_url=user.display_avatar.url)
         em.set_image(url="attachment://image.png")
         em.set_footer(text="Recorded")
 
         await ctx.send(content=f"Hash: {avatar['hash']}", embed=em, file=discord.File(f"images/{avatar['filename']}", filename="image.png"))
 
-    @commands.command(name="pie", description="View a user's presence pie chart")
-    async def pie(self, ctx, *, user: discord.Member = None):
+    @commands.hybrid_command(name="pie", description="View a user's presence pie chart")
+    @app_commands.describe(user="Who's pie chart to show")
+    async def pie(self, ctx: Context, *, user: discord.Member = None):
         if not user:
             user = ctx.author
 
-        async with ctx.typing():
+        await ctx.defer()
+
+        async with ctx.maybe_typing():
             query = """SELECT *
                        FROM presences
                        WHERE presences.user_id=$1
@@ -529,12 +528,15 @@ class Tracking(commands.Cog):
 
         await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
 
-    @commands.command(name="ring", description="View a user's presence ring", aliases=["avatarpie"])
-    async def ring(self, ctx, *, user: discord.Member = None):
+    @commands.hybrid_command(name="ring", description="View a user's presence ring", aliases=["avatarpie"])
+    @app_commands.describe(user="Who's ring chart to show")
+    async def ring(self, ctx: Context, *, user: discord.Member = None):
         if not user:
             user = ctx.author
 
-        async with ctx.typing():
+        await ctx.defer()
+
+        async with ctx.maybe_typing():
             query = """SELECT *
                        FROM presences
                        WHERE presences.user_id=$1
@@ -550,7 +552,7 @@ class Tracking(commands.Cog):
             else:
                 theme = get_theme(None)
 
-            async with self.bot.session.get(str(user.avatar_url_as(format="png"))) as resp:
+            async with self.bot.session.get(str(user.display_avatar.with_format("png").url)) as resp:
                 avatar = io.BytesIO(await resp.read())
                 avatar = Image.open(avatar)
 
@@ -617,12 +619,15 @@ class Tracking(commands.Cog):
 
         return image
 
-    @commands.command(name="chart", description="View a chart of your status over the past month")
-    async def chart(self, ctx, *, user: discord.Member = None):
+    @commands.hybrid_command(name="chart", description="View a chart of your status over the past month")
+    @app_commands.describe(user="Who's status chart to show")
+    async def chart(self, ctx: Context, *, user: discord.Member = None):
         if not user:
             user = ctx.author
 
-        async with ctx.typing():
+        await ctx.defer()
+
+        async with ctx.maybe_typing():
             query = """SELECT *
                        FROM presences
                        WHERE presences.user_id=$1
@@ -646,10 +651,18 @@ class Tracking(commands.Cog):
 
         await ctx.send(content=f"Status chart for {user} during the past 30 days", file=discord.File(file, filename="chart.png"))
 
-    @commands.command(name="chartfor", description="View a chart of your status for a specified time period")
-    async def chart_for(self, ctx, month: typing.Optional[MonthConverter] = None, year: typing.Optional[YearConverter] = None, *, user: discord.Member = None):
+    @commands.hybrid_command(name="chartfor", description="View a chart of your status for a specified time period")
+    @app_commands.describe(user="Who's status chart to show", month="Which month to show", year="Which year to show")
+    async def chart_for(
+        self,
+        ctx: Context,
+        month: typing.Optional[MonthConverter] = None,
+        year: typing.Optional[YearConverter] = None,
+        *,
+        user: discord.Member = None,  # type: ignore
+    ) -> None:
         if not user:
-            user = ctx.author
+            user = ctx.author  # type: ignore
 
         if not month and not year:
             raise commands.BadArgument("Neither year nor month provided")
@@ -660,7 +673,9 @@ class Tracking(commands.Cog):
 
         time = now.replace(year=year, month=month, day=1)-datetime.timedelta(days=1)
 
-        async with ctx.typing():
+        await ctx.defer()
+
+        async with ctx.maybe_typing():
             query = """SELECT *
                        FROM presences
                        WHERE presences.user_id=$1
@@ -744,5 +759,5 @@ class Tracking(commands.Cog):
 
         return image
 
-def setup(bot):
-    bot.add_cog(Tracking(bot))
+async def setup(bot: Logger) -> None:
+    await bot.add_cog(Tracking(bot))

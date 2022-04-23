@@ -1,5 +1,5 @@
-discord.py
-jishaku
+git+https://github.com/Rapptz/discord.py.git@69b12b97c0a3f24d8dae92f855c7ab507095edc9
+jishaku>=2.4
 psutil
 asyncpg
 humanize

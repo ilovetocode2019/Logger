@@ -1,18 +1,18 @@
+import asyncio
+import datetime
+import json
+import logging
+import os
+from typing import TYPE_CHECKING, List, Union
+
+import aiohttp
+import asyncpg
 import discord
 from discord.ext import commands
 
-import asyncpg
-import aiohttp
-import asyncio
-import os
-import logging
-import json
-import asyncio
-import datetime
-
 import config
-
 from cogs.utils import formats
+from cogs.utils.context import Context
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,25 +24,21 @@ log = logging.getLogger("logger")
 
 
 class Logger(commands.Bot):
+
+    db: asyncpg.Pool
+    log: logging.Logger
+    startup_time: datetime.datetime
+    session: aiohttp.ClientSession
+
     def __init__(self):
         super().__init__(command_prefix=config.prefix, intents=discord.Intents.all())
-        self.db_ready = asyncio.Event()
         self.startup_time = datetime.datetime.utcnow()
 
         self.log = log
 
-        self.loop.create_task(self.prepare_bot())
+    async def setup_hook(self):
+        self.db_ready = asyncio.Event()
 
-        self.cogs_to_add = ["cogs.admin", "cogs.meta", "cogs.tracking", "cogs.settings"]
-        self.load_extension("jishaku")
-        for cog in self.cogs_to_add:
-            self.load_extension(cog)
-
-    async def wait_until_db_ready(self):
-        if not self.db_ready.is_set():
-            await self.db_ready.wait()
-
-    async def prepare_bot(self):
         log.info("Preparing image directory")
         if not os.path.isdir("images"):
             os.mkdir("images")
@@ -61,7 +57,15 @@ class Logger(commands.Bot):
 
         log.info("Connecting to database")
 
-        self.db = await asyncpg.create_pool(config.database_uri, init=init)
+        try:
+            db = await asyncpg.create_pool(config.database_uri, init=init)
+        except Exception:
+            log.exception("Failed to connect to database")
+            raise
+        else:
+            if TYPE_CHECKING:
+                assert db
+            self.db = db
 
         log.info("Initiating database")
 
@@ -102,7 +106,16 @@ class Logger(commands.Bot):
                 """
         await self.db.execute(query)
 
-    async def update_users(self, users):
+        self.cogs_to_add = ["cogs.admin", "cogs.meta", "cogs.tracking", "cogs.settings"]
+        await self.load_extension("jishaku")
+        for cog in self.cogs_to_add:
+            await self.load_extension(cog)
+
+    async def wait_until_db_ready(self):
+        if not self.db_ready.is_set():
+            await self.db_ready.wait()
+
+    async def update_users(self, users: Union[List[discord.User], List[discord.Member]]):
         names = await self.db.fetch("SELECT * FROM names;")
         avatars = await self.db.fetch("SELECT * FROM avatars;")
 
@@ -113,15 +126,16 @@ class Logger(commands.Bot):
             user_avatars = [
                 avatar for avatar in avatars if avatar["user_id"] == user.id
             ]
-            if not user_avatars or user_avatars[-1]["hash"] != user.avatar:
+            avatar_key = user.avatar.key if user.avatar else None
+            if not user_avatars or user_avatars[-1]["hash"] != avatar_key:
 
                 if user.avatar:
                     try:
-                        filename = f"{user.id}-{user.avatar}.png"
-                        await user.avatar_url_as(format="png").save(f"images/{filename}")
+                        filename = f"{user.id}-{user.avatar.key}.png"
+                        await user.avatar.with_format("png").save(f"images/{filename}")
 
                         avatar_batch.append(
-                            {"user_id": user.id, "filename": filename, "hash": user.avatar}
+                            {"user_id": user.id, "filename": filename, "hash": user.avatar.key}
                         )
                     except discord.NotFound:
                         log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring")
@@ -165,10 +179,8 @@ class Logger(commands.Bot):
         else:
             log.info("No work needed for names")
 
-        self.db_ready.set()
-
     async def on_ready(self):
-        log.info(f"Logged in as {self.user.name} - {self.user.id}")
+        log.info(f"Logged in as {self.user.name} - {self.user.id}")  #type: ignore
 
         self.console = bot.get_channel(config.console)
 
@@ -244,14 +256,22 @@ class Logger(commands.Bot):
         log.info("Querying avatar and name changes")
         await self.update_users(users)
         log.info("Database is now up-to-date")
+        self.db_ready.set()
+
+    async def get_context(
+        self,
+        origin: Union[discord.Message, discord.Interaction],
+        cls=None,
+    ) -> Context:
+        return await super().get_context(origin, cls=cls or Context)
 
     def run(self):
         super().run(config.token)
 
-    async def logout(self):
+    async def close(self):
         await self.db.close()
         await self.session.close()
-        await super().logout()
+        await super().close()
 
 bot = Logger()
 bot.run()

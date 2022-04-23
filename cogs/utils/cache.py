@@ -6,14 +6,19 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 """
 
+from __future__ import annotations
 
 import asyncio
-import inspect
 import functools
+import inspect
 from collections import OrderedDict
+from typing import Any, Callable, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
 
 
-class LRUDict(OrderedDict):
+class LRUDict(OrderedDict[K, V]):
     """A dict with a maximum length which removes items in LRU fashon.
 
     This inherits from :class:`collections.OrderedDict`
@@ -29,14 +34,14 @@ class LRUDict(OrderedDict):
         Defaults to 10
     """
 
-    def __init__(self, max_len: int = 10, *args, **kwargs):
+    def __init__(self, max_len: int = 10, *args: Any, **kwargs: Any) -> None:
         if max_len <= 0:
             raise ValueError()
         self.max_len = max_len
 
         super().__init__(*args, **kwargs)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: K, value: V) -> None:
         super().__setitem__(key, value)
         super().move_to_end(key)
 
@@ -44,7 +49,7 @@ class LRUDict(OrderedDict):
             oldkey = next(iter(self))
             super().__delitem__(oldkey)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: K) -> V:
         val = super().__getitem__(key)
         super().move_to_end(key)
 
@@ -69,7 +74,7 @@ def _wrap_value(value):
     return func()
 
 
-def cache(max_len: int = 128, *, ignore_kwargs=False):
+def cache(max_len: int = 128, *, ignore_kwargs: bool = False):
     """A cache that wraps a func and uses :class:`LRUDict` to store the returning value.
 
     Don't create an instance of this directly.
@@ -124,7 +129,7 @@ def cache(max_len: int = 128, *, ignore_kwargs=False):
         Whether to ignore kwargs when resolving the key
     """
 
-    def decorator(func):
+    def decorator(func: Callable):
         _cache = LRUDict(max_len)
 
         def _resolve_key(args, kwargs):
