@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 import discord
 from discord import app_commands
@@ -62,6 +62,7 @@ class Settings(commands.Cog):
         return UserConfig.from_record(record)
 
     @commands.hybrid_command(name="theme")
+    @app_commands.describe(theme="Which theme to change to")
     async def theme(self, ctx: Context, *, theme: ThemeConverter = None):  # type: ignore
         """View or change your theme
 

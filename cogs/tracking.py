@@ -11,6 +11,7 @@ import typing
 import asyncpg
 import discord
 import humanize
+from discord import app_commands
 from discord.ext import commands, tasks
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -345,6 +346,7 @@ class Tracking(commands.Cog):
             await self.bot.db.execute(query, user.id, None)
 
     @commands.hybrid_command(name="names", description="View past usernames for a user")
+    @app_commands.describe(user="Who's username history to show")
     async def names(self, ctx: Context, *, user: discord.Member = None):  # type: ignore
         if not user:
             user = ctx.author  # type: ignore
@@ -368,6 +370,7 @@ class Tracking(commands.Cog):
             await ctx.send(page)
 
     @commands.hybrid_command(name="nicks", description="View past nicknames for a user")
+    @app_commands.describe(user="Who's nickname history to show")
     async def nicks(self, ctx: Context, *, user: discord.Member = None):  # type: ignore
         if not user:
             user = ctx.author  # type: ignore
@@ -394,6 +397,7 @@ class Tracking(commands.Cog):
             await ctx.send(page)
 
     @commands.hybrid_command(name="avatars")
+    @app_commands.describe(user="Who's avatar history to show")
     async def avatars(self, ctx: Context, *, user: discord.Member = None):  # type: ignore
         """View past avatars for a user"""
 
@@ -466,6 +470,7 @@ class Tracking(commands.Cog):
         return file
 
     @commands.hybrid_command(name="avatar", description="View a specific avatar in history")
+    @app_commands.describe(user="Who's avatar to show", avatar="The index of the avatar in history")
     async def avatar(self, ctx: Context, user: typing.Optional[discord.Member], avatar: int = 1):
         if not user:
             user = ctx.author
@@ -492,6 +497,7 @@ class Tracking(commands.Cog):
         await ctx.send(content=f"Hash: {avatar['hash']}", embed=em, file=discord.File(f"images/{avatar['filename']}", filename="image.png"))
 
     @commands.hybrid_command(name="pie", description="View a user's presence pie chart")
+    @app_commands.describe(user="Who's pie chart to show")
     async def pie(self, ctx: Context, *, user: discord.Member = None):
         if not user:
             user = ctx.author
@@ -523,6 +529,7 @@ class Tracking(commands.Cog):
         await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
 
     @commands.hybrid_command(name="ring", description="View a user's presence ring", aliases=["avatarpie"])
+    @app_commands.describe(user="Who's ring chart to show")
     async def ring(self, ctx: Context, *, user: discord.Member = None):
         if not user:
             user = ctx.author
@@ -613,6 +620,7 @@ class Tracking(commands.Cog):
         return image
 
     @commands.hybrid_command(name="chart", description="View a chart of your status over the past month")
+    @app_commands.describe(user="Who's status chart to show")
     async def chart(self, ctx: Context, *, user: discord.Member = None):
         if not user:
             user = ctx.author
@@ -644,6 +652,7 @@ class Tracking(commands.Cog):
         await ctx.send(content=f"Status chart for {user} during the past 30 days", file=discord.File(file, filename="chart.png"))
 
     @commands.hybrid_command(name="chartfor", description="View a chart of your status for a specified time period")
+    @app_commands.describe(user="Who's status chart to show", month="Which month to show", year="Which year to show")
     async def chart_for(
         self,
         ctx: Context,
