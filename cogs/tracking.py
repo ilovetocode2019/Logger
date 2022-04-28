@@ -318,7 +318,7 @@ class Tracking(commands.Cog):
                 )
 
     @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
+    async def on_presence_update(self, before: discord.Member, after: discord.Member):
         if after.nick and before.nick != after.nick:
             self._nick_batch.append(
                 {
