@@ -30,12 +30,6 @@ class Admin(commands.Cog):
         self.bot = bot
         self.hidden = True
 
-        self.outdated_packages = []
-        self.update_packages_loop.start()
-
-    def cog_unload(self):
-        self.update_packages_loop.cancel()
-
     async def cog_check(self, ctx):
         return await self.bot.is_owner(ctx.author)
 
@@ -187,53 +181,6 @@ class Admin(commands.Cog):
     async def logout(self, ctx: Context):
         await ctx.send(":wave: Logging out")
         await self.bot.close()
-
-    async def get_outdated_packages(self, wait=None):
-        installed = [
-            "asyncpg",
-            "humanize",
-            "jishaku",
-            "Pillow",
-            "psutil",
-        ]
-
-        outdated = []
-        for package in installed:
-            try:
-                current_version = pkg_resources.get_distribution(package).version
-                async with self.bot.session.get(f"https://pypi.org/pypi/{package}/json") as resp:
-                    data = await resp.json()
-
-                pypi_version = data["info"]["version"]
-                if current_version != pypi_version:
-                    outdated.append((package, current_version, pypi_version))
-            except Exception as exc:
-                traceback.print_exception(type(exc), exc, exc.__traceback__,file=sys.stderr)
-
-            if wait:
-                await asyncio.sleep(wait)
-
-        return outdated
-
-    @tasks.loop(hours=10)
-    async def update_packages_loop(self):
-        """Checks for outdated packages every 10 hours."""
-
-        outdated = await self.get_outdated_packages(wait=5)
-        self.outdated_packages = outdated
-
-        if outdated:
-            joined = " ".join([package[0] for package in outdated])
-            em = discord.Embed(title="Outdated Packages", description=f"Update with `jsk sh {sys.executable} -m pip install -U {joined}`\n", color=0x96c8da)
-
-            for package in outdated:
-                em.description += f"\n{package[0]} (Current: {package[1]} | Latest: {package[2]})"
-
-            await self.bot.console.send(embed=em)
-
-    @update_packages_loop.before_loop
-    async def before_update_packages_loop(self):
-        await self.bot.wait_until_ready()
 
 async def setup(bot: Logger) -> None:
     await bot.add_cog(Admin(bot))
