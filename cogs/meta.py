@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class HelpCommand(commands.MinimalHelpCommand):
     def get_command_signature(self, command):
-        return "{0.clean_prefix}{1.qualified_name} {1.signature}".format(self, command)
+        return "{0.clean_prefix}{1.qualified_name} {1.signature}".format(self.context, command)
 
 class Meta(commands.Cog):
     def __init__(self, bot: Logger):
