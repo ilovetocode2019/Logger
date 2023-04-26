@@ -184,6 +184,7 @@ class Logger(commands.Bot):
 
         self.console = bot.get_channel(config.console)
 
+        """
         log.info("Loading database")
         nicks = await self.db.fetch("SELECT * FROM nicks;")
         presences = await self.db.fetch("SELECT * FROM presences;")
@@ -229,11 +230,11 @@ class Logger(commands.Bot):
                     }
                 )
 
-        query = """INSERT INTO nicks (user_id, guild_id, nick)
+        query = \"\"\"INSERT INTO nicks (user_id, guild_id, nick)
                    SELECT x.user_id, x.guild_id, x.nick
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, guild_id BIGINT, nick TEXT)
-                """
+                \"\"\"
         if nick_batch:
             await self.db.execute(query, nick_batch)
             total = len(nick_batch)
@@ -241,11 +242,11 @@ class Logger(commands.Bot):
         else:
             log.info("No work needed for nicks")
 
-        query = """INSERT INTO presences (user_id, status)
+        query = "\"\"\INSERT INTO presences (user_id, status)
                    SELECT x.user_id, x.status
                    FROM jsonb_to_recordset($1::jsonb) AS
                    x(user_id BIGINT, guild_id BIGINT, status TEXT)
-                """
+                "\"\"
         if presence_batch:
             await self.db.execute(query, presence_batch)
             total = len(presence_batch)
@@ -256,6 +257,8 @@ class Logger(commands.Bot):
         log.info("Querying avatar and name changes")
         await self.update_users(users)
         log.info("Database is now up-to-date")
+        """
+
         self.db_ready.set()
 
     async def get_context(
