@@ -19,7 +19,7 @@ class Theme:
         return self.name
 
 
-DARK = Theme("dark", (255, 255, 255), (185, 185, 185), (54, 57, 63))
+DARK = Theme("dark", (255, 255, 255), (185, 185, 185), (49, 51, 56))
 LIGHT = Theme("light", (0, 0, 0), (64, 64, 64), (255, 255, 255))
 
 THEME_MAPPING: Dict[Optional[int], Theme] = {
