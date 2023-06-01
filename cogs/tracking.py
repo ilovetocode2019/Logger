@@ -87,7 +87,7 @@ class Tracking(commands.Cog):
         self._name_batch = []
         self._nick_batch = []
         self._presence_batch = []
-        self._batch_lock = asyncio.Lock(loop=bot.loop)
+        self._batch_lock = asyncio.Lock()
 
     async def cog_load(self):
         self.bulk_insert_loop.add_exception_type(asyncpg.PostgresConnectionError)
