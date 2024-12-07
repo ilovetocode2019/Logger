@@ -161,7 +161,7 @@ class Logger(commands.Bot):
 
         query = """SELECT DISTINCT ON (presences.user_id) *
                    FROM presences
-                   ORDER BY presences.user_id, presences.recorded_at DESC;
+                   ORDER BY presences.user_id, presences.recorded_at DESC
                 """
 
         presences = {presence["user_id"]: presence for presence in await self.db.fetch(query)}

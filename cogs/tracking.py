@@ -492,11 +492,11 @@ class Tracking(commands.Cog):
 
             file = io.BytesIO()
             partial = functools.partial(self.draw_pie, presences, theme, avatar)
-            image = await asycnio.to_thread(partial)
+            image = await asyncio.to_thread(partial)
             image.save(file, "PNG")
             file.seek(0)
 
-        await ctx.send(content=f"Pie chart for {user}", file=discord.File(file, filename="pie.png"))
+        await ctx.send(content=f"Ring chart for {user}", file=discord.File(file, filename="pie.png"))
 
     def draw_pie(self, presences, theme, avatar=None):
         presence_times = {"online": 0, "idle": 0, "dnd": 0, "offline": 0}
