@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 import discord
 import humanize
-import pkg_resources
 import psutil
 from discord.ext import commands, tasks
 from jishaku import codeblocks, paginators, shell

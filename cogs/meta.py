@@ -31,9 +31,6 @@ class Meta(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx: Context, error):
         print("Ignoring exception in command {}:".format(ctx.command), file=sys.stderr)
-        traceback.print_exception(
-            type(error), error, error.__traceback__, file=sys.stderr
-        )
 
         if isinstance(error, commands.errors.BotMissingPermissions):
             perms_text = "\n".join(
@@ -55,7 +52,14 @@ class Meta(commands.Cog):
         await ctx.send(f"```py\n{error}\n```")
 
         if isinstance(error, commands.CommandInvokeError):
-            em = discord.Embed(title=":warning: Error", description="", color=discord.Color.gold(), timestamp=datetime.datetime.utcnow())
+            traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+
+            em = discord.Embed(
+                title=":warning: Error",
+                description="",
+                color=discord.Color.gold(),
+                timestamp=datetime.datetime.utcnow()
+            )
 
             if TYPE_CHECKING:
                 assert isinstance(em.description, str)

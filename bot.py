@@ -22,6 +22,8 @@ logging.basicConfig(
 
 log = logging.getLogger("logger")
 
+extensions = ["cogs.admin", "cogs.meta", "cogs.tracking", "cogs.settings"]
+
 
 class Logger(commands.Bot):
 
@@ -32,18 +34,15 @@ class Logger(commands.Bot):
 
     def __init__(self):
         super().__init__(command_prefix=config.prefix, intents=discord.Intents.all())
-        self.startup_time = datetime.datetime.utcnow()
 
+        self.db_lock = asyncio.Lock()
+        self.startup_time = None
         self.log = log
 
     async def setup_hook(self):
-        self.db_ready = asyncio.Event()
-
-        log.info("Preparing image directory")
         if not os.path.isdir("images"):
             os.mkdir("images")
 
-        log.info("Creating aiohttp session")
         self.session = aiohttp.ClientSession()
 
         async def init(conn):
@@ -55,7 +54,7 @@ class Logger(commands.Bot):
                 format="text",
             )
 
-        log.info("Connecting to database")
+        log.info("Connecting to database.")
 
         try:
             db = await asyncpg.create_pool(config.database_uri, init=init)
@@ -66,8 +65,6 @@ class Logger(commands.Bot):
             if TYPE_CHECKING:
                 assert db
             self.db = db
-
-        log.info("Initiating database")
 
         query = """CREATE TABLE IF NOT EXISTS avatars (
                    id SERIAL PRIMARY KEY,
@@ -106,160 +103,143 @@ class Logger(commands.Bot):
                 """
         await self.db.execute(query)
 
-        self.cogs_to_add = ["cogs.admin", "cogs.meta", "cogs.tracking", "cogs.settings"]
         await self.load_extension("jishaku")
-        for cog in self.cogs_to_add:
-            await self.load_extension(cog)
 
-    async def wait_until_db_ready(self):
-        if not self.db_ready.is_set():
-            await self.db_ready.wait()
+        for extension in extensions:
+            await self.load_extension(extension)
 
-    async def update_users(self, users: Union[List[discord.User], List[discord.Member]]):
-        names = await self.db.fetch("SELECT * FROM names;")
-        avatars = await self.db.fetch("SELECT * FROM avatars;")
+    async def get_user_updates(self, users: List[Union[discord.User, discord.Member]]):
+        query = """SELECT DISTINCT ON (avatars.user_id) *
+                   FROM avatars
+                   ORDER BY avatars.user_id, avatars.recorded_at DESC
+                """
+
+        avatars = {avatar["user_id"]: avatar for avatar in await self.db.fetch(query)}
+
+        query = """SELECT DISTINCT ON (names.user_id) *
+                   FROM names
+                   ORDER BY names.user_id, names.recorded_at DESC
+                """
+
+        names = {name["user_id"]: name for name in await self.db.fetch(query)}
+
 
         avatar_batch = []
         name_batch = []
 
         for user in users:
-            user_avatars = [
-                avatar for avatar in avatars if avatar["user_id"] == user.id
-            ]
-            avatar_key = user.avatar.key if user.avatar else None
-            if not user_avatars or user_avatars[-1]["hash"] != avatar_key:
+            if user.id not in avatars or avatars[user.id]["hash"] != user.display_avatar.key:
+                try:
+                    filename = f"{f'{user.id}-' if user.avatar else ''}{user.display_avatar.key}.png"
+                    await user.display_avatar.with_format("png").save(f"images/{filename}")
 
-                if user.avatar:
-                    try:
-                        filename = f"{user.id}-{user.avatar.key}.png"
-                        await user.avatar.with_format("png").save(f"images/{filename}")
-
-                        avatar_batch.append(
-                            {"user_id": user.id, "filename": filename, "hash": user.avatar.key}
-                        )
-                    except discord.NotFound:
-                        log.warning(f"Failed to fetch avatar for {user} ({user.id}). Ignoring")
-
-                else:
-                    avatar = int(user.discriminator)%5
-                    filename = f"{avatar}.png"
-                    async with self.session.get(f"https://cdn.discordapp.com/embed/avatars/{avatar}.png") as resp:
-                        with open(f"images/{filename}", "wb") as f:
-                            f.write(await resp.read())
-
-                    avatar_batch.append(
-                        {"user_id": user.id, "filename": filename, "hash": None}
+                    avatar_batch.append({
+                        "user_id": user.id,
+                        "filename": filename,
+                        "hash": user.display_avatar.key
+                    })
+                except discord.NotFound:
+                    log.warning(
+                        "Failed to fetch avatar %s for %s (%s). Ignoring.",
+                        user.display_avatar.url,
+                        user.name,
+                        user.id
                     )
 
-            user_names = [name for name in names if name["user_id"] == user.id]
-            if not user_names or user_names[-1]["name"] != user.name:
+            if user.id not in names or names[user.id]["name"] != user.name:
                 name_batch.append({"user_id": user.id, "name": user.name})
 
-        query = """INSERT INTO avatars (user_id, filename, hash)
-                   SELECT x.user_id, x.filename, x.hash
-                   FROM jsonb_to_recordset($1::jsonb) AS
-                   x(user_id BIGINT, filename TEXT, hash TEXT)
+        return avatar_batch, name_batch
+
+    async def get_member_updates(self, members: List[discord.Member]):
+        query = """SELECT DISTINCT ON (nicks.guild_id, nicks.user_id) *
+                   FROM nicks
+                   ORDER BY nicks.guild_id, nicks.user_id, nicks.recorded_at DESC
                 """
-        if avatar_batch:
-            await self.db.execute(query, avatar_batch)
-            total = len(avatar_batch)
-            log.info("Registered %s to the database", format(formats.plural(total), "avatar"))
-        else:
-            log.info("No work needed for avatars")
 
-        query = """INSERT INTO names (user_id, name)
-                   SELECT x.user_id, x.name
-                   FROM jsonb_to_recordset($1::jsonb) AS
-                   x(user_id BIGINT, name TEXT)
+        nicks = {(nick["user_id"], nick["guild_id"]): nick for nick in await self.db.fetch(query)}
+
+        query = """SELECT DISTINCT ON (presences.user_id) *
+                   FROM presences
+                   ORDER BY presences.user_id, presences.recorded_at DESC;
                 """
-        if name_batch:
-            await self.db.execute(query, name_batch)
-            total = len(avatar_batch)
-            log.info("Registered %s to the database", format(formats.plural(total), "name"))
-        else:
-            log.info("No work needed for names")
 
-    async def on_ready(self):
-        log.info(f"Logged in as {self.user.name} - {self.user.id}")  #type: ignore
-
-        self.console = bot.get_channel(config.console)
-
-        """
-        log.info("Loading database")
-        nicks = await self.db.fetch("SELECT * FROM nicks;")
-        presences = await self.db.fetch("SELECT * FROM presences;")
-
-        log.info("Loading all members and users")
-        users = [discord.User._copy(user) for user in bot.users]
-        members = [discord.Member._copy(member) for member in self.get_all_members()]
-
-        log.info("Preparing database")
-
-        log.info("Querying nick, and presence changes")
+        presences = {presence["user_id"]: presence for presence in await self.db.fetch(query)}
 
         nick_batch = []
         presence_batch = []
+        _processed_presences = []
 
         for member in members:
-            member_nicks = [
-                nick
-                for nick in nicks
-                if nick["user_id"] == member.id and nick["guild_id"] == member.guild.id
-            ]
-            if member.nick and (
-                not member_nicks or member_nicks[-1]["nick"] != member.nick
-            ):
-                nick_batch.append(
-                    {
-                        "user_id": member.id,
-                        "guild_id": member.guild.id,
-                        "nick": member.nick,
-                    }
-                )
+            if member.nick and ((member.id, member.guild.id) not in nicks or nicks[(member.id, member.guild.id)]["nick"] != member.nick):
+                nick_batch.append({
+                    "user_id": member.id,
+                    "guild_id": member.guild.id,
+                    "nick": member.nick,
+                })
 
-            member_presences = [
-                presence
-                for presence in presences
-                if presence["user_id"] == member.id
-            ]
-            if (not member_presences or member_presences[-1]["status"] != str(member.status)) and member.id not in [presence["user_id"] for presence in presence_batch]:
-                presence_batch.append(
-                    {
-                        "user_id": member.id,
-                        "status": str(member.status)
-                    }
-                )
+            if (member.id not in presences or presences[member.id]["status"] != str(member.status)) and member.id not in _processed_presences:
+                _processed_presences.append(member.id)
+                presence_batch.append({"user_id": member.id, "status": str(member.status)})
 
-        query = \"\"\"INSERT INTO nicks (user_id, guild_id, nick)
-                   SELECT x.user_id, x.guild_id, x.nick
-                   FROM jsonb_to_recordset($1::jsonb) AS
-                   x(user_id BIGINT, guild_id BIGINT, nick TEXT)
-                \"\"\"
-        if nick_batch:
+        return nick_batch, presence_batch
+
+    async def on_ready(self):
+        log.info("Logged in as %s - %s.", self.user.name, self.user.id)
+
+        self.console = bot.get_channel(config.console)
+
+        if not self.startup_time:
+            self.startup_time = discord.utils.utcnow()
+
+        async with self.db_lock:
+            # checking for missed events or initial startup
+            users = [discord.User._copy(user) for user in bot.users]
+            members =[discord.Member._copy(member) for member in self.get_all_members()]
+
+            log.info("Looking for user related changes...")
+            avatar_batch, name_batch = await self.get_user_updates(users)
+
+            log.info("Looking for member related changes...")
+            nick_batch, presence_batch = await self.get_member_updates(members)
+
+            log.info("Applying changes to the database...")
+
+            query = """INSERT INTO avatars (user_id, filename, hash)
+                       SELECT x.user_id, x.filename, x.hash
+                       FROM jsonb_to_recordset($1::jsonb) AS
+                       x(user_id BIGINT, filename TEXT, hash TEXT);
+                    """
+            await self.db.execute(query, avatar_batch)
+
+            query = """INSERT INTO names (user_id, name)
+                       SELECT x.user_id, x.name
+                       FROM jsonb_to_recordset($1::jsonb) AS
+                       x(user_id BIGINT, name TEXT)
+                    """
+            await self.db.execute(query, name_batch)
+
+            query = """INSERT INTO nicks (user_id, guild_id, nick)
+                       SELECT x.user_id, x.guild_id, x.nick
+                       FROM jsonb_to_recordset($1::jsonb) AS
+                       x(user_id BIGINT, guild_id BIGINT, nick TEXT);
+                    """
             await self.db.execute(query, nick_batch)
-            total = len(nick_batch)
-            log.info("Registered %s to the database", format(formats.plural(total), "nick"))
-        else:
-            log.info("No work needed for nicks")
 
-        query = "\"\"\INSERT INTO presences (user_id, status)
-                   SELECT x.user_id, x.status
-                   FROM jsonb_to_recordset($1::jsonb) AS
-                   x(user_id BIGINT, guild_id BIGINT, status TEXT)
-                "\"\"
-        if presence_batch:
+            query = """INSERT INTO presences (user_id, status)
+                       SELECT x.user_id, x.status
+                       FROM jsonb_to_recordset($1::jsonb) AS
+                       x(user_id BIGINT, guild_id BIGINT, status TEXT);
+                    """
             await self.db.execute(query, presence_batch)
-            total = len(presence_batch)
-            log.info("Registered %s to the database", format(formats.plural(total), "presence"))
-        else:
-            log.info("No work needed to presences")
 
-        log.info("Querying avatar and name changes")
-        await self.update_users(users)
-        log.info("Database is now up-to-date")
-        """
-
-        self.db_ready.set()
+            log.info(
+                "Registered %s, %s, %s, and %s to the database on startup.",
+                format(formats.plural(len(avatar_batch)), "avatar"),
+                format(formats.plural(len(name_batch)), "name"),
+                format(formats.plural(len(nick_batch)), "nick"),
+                format(formats.plural(len(presence_batch)), "presence")
+            )
 
     async def get_context(
         self,
