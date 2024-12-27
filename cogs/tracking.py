@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import calendar
 import datetime
-import functools
 import io
 import logging
 import typing
@@ -348,8 +347,7 @@ class Tracking(commands.Cog):
                     """
             avatars = await self.bot.db.fetch(query, user.id)
 
-            partial = functools.partial(self.draw_avatars, avatars)
-            file = await asyncio.to_thread(partial)
+            file = await asyncio.to_thread(self.draw_avatars, avatars)
             file.seek(0)
 
         await ctx.send(content=f"Avatars for {user}", file=discord.File(fp=file, filename="image.png"))
@@ -455,8 +453,7 @@ class Tracking(commands.Cog):
                 theme = get_theme(None)
 
             file = io.BytesIO()
-            partial = functools.partial(self.draw_pie, presences, theme)
-            image = await asyncio.to_thread(partial)
+            image = await asyncio.to_thread(self.draw_pie, presences, theme)
             image.save(file, "PNG")
             file.seek(0)
 
@@ -491,8 +488,7 @@ class Tracking(commands.Cog):
                 avatar = Image.open(avatar)
 
             file = io.BytesIO()
-            partial = functools.partial(self.draw_pie, presences, theme, avatar)
-            image = await asyncio.to_thread(partial)
+            image = await asyncio.to_thread(self.draw_pie, presences, theme, avatar)
             image.save(file, "PNG")
             file.seek(0)
 
@@ -578,8 +574,7 @@ class Tracking(commands.Cog):
                 theme = get_theme(None)
 
             file = io.BytesIO()
-            partial = functools.partial(self.draw_chart, presences, theme)
-            image = await asyncio.to_thread(partial)
+            image = await asyncio.to_thread(self.draw_chart, presences, theme)
             image.save(file, "PNG")
             file.seek(0)
 
@@ -626,8 +621,7 @@ class Tracking(commands.Cog):
                 theme = get_theme(None)
 
             file = io.BytesIO()
-            partial = functools.partial(self.draw_chart, presences, theme, time)
-            image = await asyncio.to_thread(partial)
+            image = await asyncio.to_thread(self.draw_chart, presences, theme, time)
             image.save(file, "PNG")
             file.seek(0)
 
